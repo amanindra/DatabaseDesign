@@ -21,7 +21,7 @@ public class MyDatabase {
 	protected static RandomAccessFile dbColumnFile;
 	protected static RandomAccessFile dbMasterTableFile;
 	protected static ArrayList<String> history;
-	static long pageSize = 512;
+	static long pageSize = 512L;
 	static Scanner scanner = new Scanner(System.in).useDelimiter(";");
 
 	private static void buildDBColumnTable(RandomAccessFile mDBColumnFile,
