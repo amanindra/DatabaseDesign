@@ -86,6 +86,8 @@ public class BTree {
 		}
 	}
 
+	
+	
 	public BTree(RandomAccessFile file, String tableName, boolean isColSchema,
 			boolean isTableSchema) {
 		this(file, tableName);
@@ -106,7 +108,7 @@ public class BTree {
 			binaryFile.writeInt(rowID);
 
 		} catch (IOException e) {
-			System.out.println("Unexpected Error");
+			System.out.println("Unexpected Error in createNewInterior");
 		}
 	}
 
