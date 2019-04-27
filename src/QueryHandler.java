@@ -168,7 +168,7 @@ public class QueryHandler {
     // position
     arryL.add("text"); // search cond col data type
     arryL.add(tableName); // search cond col value
-    List<LinkedHashMap<String, ArrayList<String>>> op = tableBTree.searchNonPrimaryCol(arryL);
+    List<LinkedHashMap<String, ArrayList<String>>> op = tableBTree.searchWithNonPK(arryL);
     for (LinkedHashMap<String, ArrayList<String>> map : op) {
       Integer rowId = Integer.parseInt(map.get("rowid").get(0));
       LinkedHashMap<String, ArrayList<String>> token = new LinkedHashMap<String, ArrayList<String>>();
@@ -184,7 +184,7 @@ public class QueryHandler {
     // position
     arryL.add("text"); // search cond col data type
     arryL.add(tableName); // search cond col value
-    List<LinkedHashMap<String, ArrayList<String>>> opp = columnBTree.searchNonPrimaryCol(arryL);
+    List<LinkedHashMap<String, ArrayList<String>>> opp = columnBTree.searchWithNonPK(arryL);
     for (LinkedHashMap<String, ArrayList<String>> map : opp) {
       Integer rowId = Integer.parseInt(map.get("rowid").get(0));
       LinkedHashMap<String, ArrayList<String>> token = new LinkedHashMap<String, ArrayList<String>>();
@@ -199,24 +199,24 @@ public class QueryHandler {
 
 
 
-  public static void updateSequence(String tableName, String colName) throws IOException {
-	    String seqName = Utility.getSequenceName(tableName, colName);
+  public static void update(String tblName, String colName) throws IOException {
+	    String name = Utility.getSequenceName(tblName, colName);
 	    int value = 0;
 	    try {
-	      RandomAccessFile seqFile = new RandomAccessFile(Utility.getFilePath("seq", seqName), "rw");
-	      seqFile.seek(0);
-	      int seed = seqFile.readInt();
-	      int incrementBy =  seqFile.readInt();
-	      value = seqFile.readInt();
+	      RandomAccessFile file = new RandomAccessFile(Utility.getFilePath("seq", name), "rw");
+	      file.seek(0);
+	      int seed = file.readInt();
+	      int incrementBy =  file.readInt();
+	      value = file.readInt();
 
 	      if (value == 0) value = seed;
 	      else value += incrementBy;
 
-	      seqFile.seek(0);
-	      seqFile.writeInt(seed);
-	      seqFile.writeInt(incrementBy);
-	      seqFile.writeInt(value);
-	      if (seqFile != null) seqFile.close();
+	      file.seek(0);
+	      file.writeInt(seed);
+	      file.writeInt(incrementBy);
+	      file.writeInt(value);
+	      if (file != null) file.close();
 	    } catch (FileNotFoundException e) {
 	      e.printStackTrace();
 	    }

@@ -259,7 +259,7 @@ public class ParseQuery {
 
 					} else {
 						List<LinkedHashMap<String, ArrayList<String>>> op = table
-								.searchNonPrimaryCol(arryL);
+								.searchWithNonPK(arryL);
 						QueryHandler.printTable(op);
 
 					}
@@ -441,7 +441,7 @@ public class ParseQuery {
 
 						} else {
 							List<LinkedHashMap<String, ArrayList<String>>> op = tableBTree
-									.searchNonPrimaryCol(arryL);
+									.searchWithNonPK(arryL);
 							for (LinkedHashMap<String, ArrayList<String>> map : op) {
 
 								for (String x : removeColumn) {
@@ -859,14 +859,14 @@ public class ParseQuery {
 								new ArrayList<String>(Arrays.asList(tableInfo
 										.get(col).get(0), String
 										.valueOf(seqValue))));
-						QueryHandler.updateSequence(tableName, col);
+						QueryHandler.update(tableName, col);
 					}
 
 					if (tableTree.isEmptyTable()) {
 						tableTree.createNewTableLeaf(tableInfo);
 
 					} else {
-						if (tableTree.isPrimaryKeyExists(primaryKeyVal)) {
+						if (tableTree.isPKPresent(primaryKeyVal)) {
 							System.out.println(" Primary key with value "
 									+ primaryKeyVal + " already exists");
 							return;

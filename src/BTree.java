@@ -20,47 +20,53 @@ public class BTree {
 	private static final String TEXT = "text";
 	private static final String DATE2 = "date";
 	private static final String DATETIME = "datetime";
+	private long NO_OF_CELLS_HEADER = 0;
+	private long START_OF_CELL_HEADER = 0;
 	private static final String DOUBLE = "double";
 	private static final String REAL = "real";
+	public static final int LEAF = 13;
 	private static final String BIGINT = "bigint";
+	public final int NODE_TYPE_OFFSET = 1;
 	private static final String INT = "int";
 	private static final String SMALLINT = "smallint";
 	private static final String TINYINT = "tinyint";
-	public static final int NODE_INTERNAL = 5;
-	public static final int NODE_LEAF = 13;
-	public final int NODE_TYPE_OFFSET = 1;
-	private RandomAccessFile binaryFile;
+	private boolean isTableSchema;
+
+	private String tableName;
+	
+
+	private boolean isLeafPage = false;
+
+	private int lastPage = 1;
+
+	
+	public static final int INTERNAL = 5;
+	
+	
+	private RandomAccessFile fileBinry;
 
 	private static final int pageSize = 512;
 
 	private int currentPage = 1;
 
-	private long pageHeader_Offset_noOfCells = 0;
-	private long pageHeader_Offset_startOfCell = 0;
+	
 	private long pageHeader_Offset_rightPagePointer = 0;
 	private long pageHeader_array_offset = 0;
 	private long pageHeader_offset = 0;
 
 	private ZoneId zoneId = ZoneId.of("America/Chicago");
 
-	private boolean isLeafPage = false;
-
-	private int lastPage = 1;
-
 	private ArrayList<Integer> routeOfLeafPage = new ArrayList<>();
 
 	private boolean isColumnSchema;
 
-	private boolean isTableSchema;
-
-	private String tableName;
 
 	private String tableKey = "rowid";
 
 	private BTree mDBColumnFiletree;
 
 	public BTree(RandomAccessFile file, String tableName) {
-		binaryFile = file;
+		fileBinry = file;
 		this.tableName = tableName;
 		try {
 			if (file.length() > 0) {
@@ -86,8 +92,6 @@ public class BTree {
 		}
 	}
 
-	
-	
 	public BTree(RandomAccessFile file, String tableName, boolean isColSchema,
 			boolean isTableSchema) {
 		this(file, tableName);
@@ -97,345 +101,74 @@ public class BTree {
 
 	public void createNewInterior(int pageNumber, int rowID, int pageRight) {
 		try {
-			binaryFile.seek(0);
-			binaryFile.write(5);
-			binaryFile.write(1);
-			binaryFile.writeShort(pageSize - 8);
-			binaryFile.writeInt(pageRight);
-			binaryFile.writeShort(pageSize - 8);
-			binaryFile.seek(pageSize - 8);
-			binaryFile.writeInt(pageNumber);
-			binaryFile.writeInt(rowID);
+			fileBinry.seek(0);
+			fileBinry.write(5);
+			fileBinry.write(1);
+			fileBinry.writeShort(pageSize - 8);
+			fileBinry.writeInt(pageRight);
+			fileBinry.writeShort(pageSize - 8);
+			fileBinry.seek(pageSize - 8);
+			fileBinry.writeInt(pageNumber);
+			fileBinry.writeInt(rowID);
 
 		} catch (IOException e) {
-			System.out.println("Unexpected Error in createNewInterior");
+			System.out.println("Unexpected Error");
 		}
 	}
 
-	private void writeCellInterior(int pageLocation, int pageNumber, int rowID,
-			int pageRight) {
-		try {
 
-			binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-			short No_OfCells = binaryFile.readByte();
-			if (No_OfCells < 49) {
-				binaryFile.seek(pageLocation * pageSize - pageSize + 4);
-				if (binaryFile.readInt() == pageNumber && pageRight != -1) {
-					binaryFile.seek(pageLocation * pageSize - pageSize + 4);
-					binaryFile.writeInt(pageRight);
-					long cellStartOffset = (pageLocation * (pageSize))
-							- (8 * (No_OfCells + 1));
-					binaryFile.seek(pageLocation * pageSize - pageSize + 2);
-					binaryFile.writeShort((int) cellStartOffset);
-					binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-					binaryFile.write(No_OfCells + 1);
-					binaryFile.seek(cellStartOffset);
-					binaryFile.writeInt(pageNumber);
-					binaryFile.writeInt(rowID);
-					binaryFile.seek((pageLocation * pageSize - pageSize + 8)
-							+ (2 * No_OfCells));
-					binaryFile.writeShort((short) cellStartOffset);
-				} else {
-					int flag = 0;
-					for (int i = 0; i < No_OfCells; i++) {
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * i));
-						binaryFile.seek(binaryFile.readUnsignedShort());
-						if (binaryFile.readInt() == pageNumber) {
-							flag = 1;
-							int tempRowID = binaryFile.readInt();
-							binaryFile
-									.seek((pageLocation * pageSize - pageSize + 8)
-											+ (2 * i));
-							binaryFile.seek(binaryFile.readUnsignedShort() + 4);
-							binaryFile.writeInt(rowID);
-							long cellStartOffset = (pageLocation * (pageSize))
-									- (8 * (No_OfCells + 1));
-							binaryFile.seek(pageLocation * pageSize - pageSize
-									+ 2);
-							binaryFile.writeShort((int) cellStartOffset);
-							binaryFile.seek(pageLocation * pageSize - pageSize
-									+ 1);
-							binaryFile.write(No_OfCells + 1);
-							binaryFile.seek(cellStartOffset);
-							binaryFile.writeInt(pageRight);
-							binaryFile.writeInt(tempRowID);
-							binaryFile.seek(pageLocation * pageSize - pageSize
-									+ 8 + 2 * No_OfCells);
-							binaryFile.writeShort((short) cellStartOffset);
-						}
-					}
-					if (flag == 0) {
-						long cellStartOffset = (pageLocation * (pageSize))
-								- (8 * (No_OfCells + 1));
-						binaryFile.seek(pageLocation * pageSize - pageSize + 2);
-						binaryFile.writeShort((int) cellStartOffset);
-						binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-						binaryFile.write(No_OfCells + 1);
-						binaryFile.seek(cellStartOffset);
-						binaryFile.writeInt(pageNumber);
-						binaryFile.writeInt(rowID);
-						binaryFile.seek(pageLocation * pageSize - pageSize + 8
-								+ 2 * No_OfCells);
-						binaryFile.writeShort((short) cellStartOffset);
-					}
-				}
-				int tempAddi, tempAddj, tempi, tempj;
-				for (int i = 0; i <= No_OfCells; i++)
-					for (int j = i + 1; j <= No_OfCells; j++) {
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * i));
-						tempAddi = binaryFile.readUnsignedShort();
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * j));
-						tempAddj = binaryFile.readUnsignedShort();
-						binaryFile.seek(tempAddi + 4);
-						tempi = binaryFile.readInt();
-						binaryFile.seek(tempAddj + 4);
-						tempj = binaryFile.readInt();
-						if (tempi > tempj) {
-							binaryFile
-									.seek((pageLocation * pageSize - pageSize + 8)
-											+ (2 * i));
-							binaryFile.writeShort(tempAddj);
-							binaryFile
-									.seek((pageLocation * pageSize - pageSize + 8)
-											+ (2 * j));
-							binaryFile.writeShort(tempAddi);
-
-						}
-					}
-			} else {
-				binaryFile.seek(pageLocation * pageSize - pageSize + 4);
-				if (binaryFile.readInt() == pageNumber && pageRight != -1) {
-					binaryFile.seek(pageLocation * pageSize - pageSize + 4);
-					binaryFile.writeInt(pageRight);
-					long cellStartOffset = (pageLocation * (pageSize))
-							- (8 * (No_OfCells + 1));
-					binaryFile.seek(pageLocation * pageSize - pageSize + 2);
-					binaryFile.writeShort((int) cellStartOffset);
-					binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-					binaryFile.write(No_OfCells + 1);
-					binaryFile.seek(cellStartOffset);
-					binaryFile.writeInt(pageNumber);
-					binaryFile.writeInt(rowID);
-					binaryFile.seek((pageLocation * pageSize - pageSize + 8)
-							+ (2 * No_OfCells));
-					binaryFile.writeShort((short) cellStartOffset);
-				} else {
-					int flag = 0;
-					for (int i = 0; i < No_OfCells; i++) {
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * i));
-						binaryFile.seek(binaryFile.readUnsignedShort());
-						if (binaryFile.readInt() == pageNumber) {
-							flag = 1;
-							int tempRowID = binaryFile.readInt();
-							binaryFile
-									.seek((pageLocation * pageSize - pageSize + 8)
-											+ (2 * i));
-							binaryFile.seek(binaryFile.readUnsignedShort() + 4);
-							binaryFile.writeInt(rowID);
-							long cellStartOffset = (pageLocation * (pageSize))
-									- (8 * (No_OfCells + 1));
-							binaryFile.seek(pageLocation * pageSize - pageSize
-									+ 2);
-							binaryFile.writeShort((int) cellStartOffset);
-							binaryFile.seek(pageLocation * pageSize - pageSize
-									+ 1);
-							binaryFile.write(No_OfCells + 1);
-							binaryFile.seek(cellStartOffset);
-							binaryFile.writeInt(pageRight);
-							binaryFile.writeInt(tempRowID);
-							binaryFile.seek(pageLocation * pageSize - pageSize
-									+ 8 + 2 * No_OfCells);
-							binaryFile.writeShort((short) cellStartOffset);
-						}
-					}
-					if (flag == 0) {
-						long cellStartOffset = (pageLocation * (pageSize))
-								- (8 * (No_OfCells + 1));
-						binaryFile.seek(pageLocation * pageSize - pageSize + 2);
-						binaryFile.writeShort((int) cellStartOffset);
-						binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-						binaryFile.write(No_OfCells + 1);
-						binaryFile.seek(cellStartOffset);
-						binaryFile.writeInt(pageNumber);
-						binaryFile.writeInt(rowID);
-						binaryFile.seek(pageLocation * pageSize - pageSize + 8
-								+ 2 * No_OfCells);
-						binaryFile.writeShort((short) cellStartOffset);
-					}
-				}
-				int tempAddi, tempAddj, tempi, tempj;
-				for (int i = 0; i <= No_OfCells; i++)
-					for (int j = i + 1; j <= No_OfCells; j++) {
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * i));
-						tempAddi = binaryFile.readUnsignedShort();
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * j));
-						tempAddj = binaryFile.readUnsignedShort();
-						binaryFile.seek(tempAddi + 4);
-						tempi = binaryFile.readInt();
-						binaryFile.seek(tempAddj + 4);
-						tempj = binaryFile.readInt();
-						if (tempi > tempj) {
-							binaryFile
-									.seek((pageLocation * pageSize - pageSize + 8)
-											+ (2 * i));
-							binaryFile.writeShort(tempAddj);
-							binaryFile
-									.seek((pageLocation * pageSize - pageSize + 8)
-											+ (2 * j));
-							binaryFile.writeShort(tempAddi);
-
-						}
-					}
-				if (pageLocation == 1) {
-					int x, y;
-					binaryFile.seek((pageLocation * pageSize - pageSize + 8)
-							+ (2 * 25));
-					binaryFile.seek(binaryFile.readUnsignedShort());
-					x = binaryFile.readInt();
-					y = binaryFile.readInt();
-					writePageHeader(lastPage + 1, false, 0, x);
-					for (int i = 0; i < 25; i++) {
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * i));
-						binaryFile.seek(binaryFile.readUnsignedShort());
-						writeCellInterior(lastPage + 1, binaryFile.readInt(),
-								binaryFile.readInt(), -1);
-					}
-					binaryFile.seek(pageLocation * pageSize - pageSize + 4);
-					writePageHeader(lastPage + 2, false, 0,
-							binaryFile.readInt());
-					for (int i = 26; i < 50; i++) {
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * i));
-						binaryFile.seek(binaryFile.readUnsignedShort());
-						writeCellInterior(lastPage + 2, binaryFile.readInt(),
-								binaryFile.readInt(), -1);
-					}
-					writePageHeader(1, false, 0, lastPage + 2);
-
-					writeCellInterior(1, lastPage + 1, y, lastPage + 2);
-					lastPage += 2;
-
-				} else {
-
-					int x, y;
-					binaryFile.seek((pageLocation * pageSize - pageSize + 8)
-							+ (2 * 25));
-					binaryFile.seek(binaryFile.readUnsignedShort());
-					x = binaryFile.readInt();
-					y = binaryFile.readInt();
-					binaryFile.seek(pageLocation * pageSize - pageSize + 4);
-					writePageHeader(lastPage + 1, false, 0,
-							binaryFile.readInt());
-					binaryFile.seek(pageLocation * pageSize - pageSize + 4);
-					binaryFile.writeInt(x);
-					for (int i = 26; i < 50; i++) {
-						binaryFile
-								.seek((pageLocation * pageSize - pageSize + 8)
-										+ (2 * i));
-						binaryFile.seek(binaryFile.readUnsignedShort());
-						writeCellInterior(lastPage + 1, binaryFile.readInt(),
-								binaryFile.readInt(), -1);
-
-					}
-
-					binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-					binaryFile.write(25);
-
-					int lastInteriorPage = routeOfLeafPage
-							.remove(routeOfLeafPage.size() - 1);
-
-					writeCellInterior(lastInteriorPage, pageLocation, y,
-							lastPage + 1);
-					lastPage++;
-
-				}
-			}
-
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-	}
 
 	public void deleteCellInterior(int pageLocation, int pageNumber) {
 		try {
-			binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-			short No_OfCells = binaryFile.readByte();
+			fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+			short No_OfCells = fileBinry.readByte();
 			int pos = No_OfCells;
 			for (int i = 0; i < No_OfCells; i++) {
-				binaryFile.seek((pageLocation * pageSize - pageSize + 8)
+				fileBinry.seek((pageLocation * pageSize - pageSize + 8)
 						+ (2 * (i)));
-				binaryFile.seek(binaryFile.readUnsignedShort());
-				if (pageNumber == binaryFile.readInt()) {
+				fileBinry.seek(fileBinry.readUnsignedShort());
+				if (pageNumber == fileBinry.readInt()) {
 					pos = i;
-					binaryFile.seek(pageLocation * pageSize - pageSize + 1);
-					binaryFile.write(No_OfCells - 1);
+					fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+					fileBinry.write(No_OfCells - 1);
 					break;
 				}
 			}
 			int temp;
 			while (pos < No_OfCells) {
-				binaryFile.seek((pageLocation * pageSize - pageSize + 8)
+				fileBinry.seek((pageLocation * pageSize - pageSize + 8)
 						+ (2 * (pos + 1)));
-				temp = binaryFile.readUnsignedShort();
-				binaryFile.seek((pageLocation * pageSize - pageSize + 8)
+				temp = fileBinry.readUnsignedShort();
+				fileBinry.seek((pageLocation * pageSize - pageSize + 8)
 						+ (2 * (pos)));
-				binaryFile.writeShort(temp);
+				fileBinry.writeShort(temp);
 				pos++;
 			}
 			temp = 0;
 			for (int i = 0; i < No_OfCells - 1; i++) {
-				binaryFile.seek((pageLocation * pageSize - pageSize + 8)
+				fileBinry.seek((pageLocation * pageSize - pageSize + 8)
 						+ (2 * (i)));
-				if (temp < binaryFile.readUnsignedShort()) {
-					binaryFile.seek((pageLocation * pageSize - pageSize + 8)
+				if (temp < fileBinry.readUnsignedShort()) {
+					fileBinry.seek((pageLocation * pageSize - pageSize + 8)
 							+ (2 * (i)));
-					temp = binaryFile.readUnsignedShort();
+					temp = fileBinry.readUnsignedShort();
 				}
 			}
-			binaryFile.seek(pageLocation * pageSize - pageSize + 2);
-			binaryFile.writeShort(temp);
+			fileBinry.seek(pageLocation * pageSize - pageSize + 2);
+			fileBinry.writeShort(temp);
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
 	}
 
-	public void createEmptyTable() {
 
-		try {
-			currentPage = 1;
-			binaryFile.setLength(0);
-
-			binaryFile.setLength(pageSize);
-
-			writePageHeader(currentPage, true, 0, -1);
-
-		} catch (IOException e) {
-			System.out.println("Unexpected Error");
-		}
-
-	}
 
 	public void createNewTableLeaf(Map<String, ArrayList<String>> token) {
 		try {
 			currentPage = 1;
-			binaryFile.setLength(0);
+			fileBinry.setLength(0);
 
-			binaryFile.setLength(pageSize);
+			fileBinry.setLength(pageSize);
 
 			writePageHeader(currentPage, true, 0, -1);
 
@@ -451,32 +184,28 @@ public class BTree {
 		}
 	}
 
-	public int getNextMaxRowID() {
-		currentPage = 1;
-		searchRightMostLeafNode();
-		readPageHeader(currentPage);
+
+	public void createEmptyTable() {
+
 		try {
-			binaryFile.seek(pageHeader_Offset_noOfCells);
-			int noOfCells = binaryFile.readUnsignedByte();
-			binaryFile.seek(pageHeader_array_offset + (2 * (noOfCells - 1)));
-			long address = binaryFile.readUnsignedShort();
-			binaryFile.seek(address);
-			binaryFile.readShort();
-			return binaryFile.readInt();
+			currentPage = 1;
+			fileBinry.setLength(0);
+
+			fileBinry.setLength(pageSize);
+
+			writePageHeader(currentPage, true, 0, -1);
 
 		} catch (IOException e) {
 			System.out.println("Unexpected Error");
 		}
-		return -1;
 
 	}
-
 	public LinkedHashMap<String, ArrayList<String>> getSchema(String tableName) {
 		ArrayList<String> vall = new ArrayList<String>();
 		vall.add("1");
 		vall.add("TEXT");
 		vall.add(tableName);
-		List<LinkedHashMap<String, ArrayList<String>>> output = searchNonPrimaryCol(vall);
+		List<LinkedHashMap<String, ArrayList<String>>> output = searchWithNonPK(vall);
 
 		LinkedHashMap<String, ArrayList<String>> finalResult = new LinkedHashMap<String, ArrayList<String>>();
 
@@ -509,21 +238,40 @@ public class BTree {
 		return finalResult;
 
 	}
+	public int getNextMaxRowID() {
+		currentPage = 1;
+		searchRMLNode();
+		readPageHeader(currentPage);
+		try {
+			fileBinry.seek(NO_OF_CELLS_HEADER);
+			int noOfCells = fileBinry.readUnsignedByte();
+			fileBinry.seek(pageHeader_array_offset + (2 * (noOfCells - 1)));
+			long address = fileBinry.readUnsignedShort();
+			fileBinry.seek(address);
+			fileBinry.readShort();
+			return fileBinry.readInt();
 
-	public boolean isPrimaryKeyExists(int newKey) {
+		} catch (IOException e) {
+			System.out.println("Unexpected Error");
+		}
+		return -1;
+
+	}
+	
+	public boolean isPKPresent(int key) {
 
 		currentPage = 1;
 
-		int rowId = newKey;
+		int rowId = key;
 		searchLeafPage(rowId, false);
 		readPageHeader(currentPage);
 		long[] result = getCellOffset(rowId);
 		long cellOffset = result[1];
 		if (cellOffset > 0) {
 			try {
-				binaryFile.seek(cellOffset);
-				binaryFile.readUnsignedShort();
-				int actualRowID = binaryFile.readInt();
+				fileBinry.seek(cellOffset);
+				fileBinry.readUnsignedShort();
+				int actualRowID = fileBinry.readInt();
 				// System.out.println("Row id is " + actualRowID);
 				if (actualRowID == rowId) {
 
@@ -554,9 +302,9 @@ public class BTree {
 		long cellOffset = result[1];
 		if (cellOffset > 0) {
 			try {
-				binaryFile.seek(cellOffset);
-				binaryFile.readUnsignedShort();
-				int actualRowID = binaryFile.readInt();
+				fileBinry.seek(cellOffset);
+				fileBinry.readUnsignedShort();
+				int actualRowID = fileBinry.readInt();
 				if (actualRowID == rowId) {
 
 					if (isColumnSchema) {
@@ -607,48 +355,48 @@ public class BTree {
 		long cellOffset = retVal[1];
 		if (cellOffset > 0) {
 			try {
-				binaryFile.seek(cellOffset);
-				binaryFile.readUnsignedShort();
-				int actualRowID = binaryFile.readInt();
+				fileBinry.seek(cellOffset);
+				fileBinry.readUnsignedShort();
+				int actualRowID = fileBinry.readInt();
 				// System.out.println("Row id is " + actualRowID);
 				if (actualRowID == rowId) {
 
-					binaryFile.seek(pageHeader_Offset_startOfCell);
-					long startOfCell = binaryFile.readUnsignedShort();
+					fileBinry.seek(START_OF_CELL_HEADER);
+					long startOfCell = fileBinry.readUnsignedShort();
 					if (cellOffset == startOfCell) {
 
-						binaryFile.seek(cellOffset);
-						int payLoadSize = binaryFile.readUnsignedShort();
-						binaryFile.seek(pageHeader_Offset_startOfCell);
-						binaryFile
+						fileBinry.seek(cellOffset);
+						int payLoadSize = fileBinry.readUnsignedShort();
+						fileBinry.seek(START_OF_CELL_HEADER);
+						fileBinry
 								.writeShort((int) (startOfCell - payLoadSize - 6));
 
 					}
 
-					binaryFile.seek(pageHeader_Offset_noOfCells);
+					fileBinry.seek(NO_OF_CELLS_HEADER);
 
-					int No_OfCells = binaryFile.readUnsignedByte();
+					int No_OfCells = fileBinry.readUnsignedByte();
 
 					int temp;
 					long pos = retVal[0];
 					while (pos < No_OfCells) {
-						binaryFile.seek((currentPage * pageSize - pageSize + 8)
+						fileBinry.seek((currentPage * pageSize - pageSize + 8)
 								+ (2 * (pos + 1)));
-						temp = binaryFile.readUnsignedShort();
-						binaryFile.seek((currentPage * pageSize - pageSize + 8)
+						temp = fileBinry.readUnsignedShort();
+						fileBinry.seek((currentPage * pageSize - pageSize + 8)
 								+ (2 * (pos)));
-						binaryFile.writeShort(temp);
+						fileBinry.writeShort(temp);
 						pos++;
 					}
 
-					binaryFile.seek(pageHeader_Offset_noOfCells);
-					int col = binaryFile.readUnsignedByte();
-					binaryFile.seek(pageHeader_Offset_noOfCells);
-					binaryFile.writeByte(--col);
+					fileBinry.seek(NO_OF_CELLS_HEADER);
+					int col = fileBinry.readUnsignedByte();
+					fileBinry.seek(NO_OF_CELLS_HEADER);
+					fileBinry.writeByte(--col);
 					if (col == 0) {
 
-						binaryFile.seek(pageHeader_Offset_startOfCell);
-						binaryFile.writeShort((int) (currentPage * pageSize));
+						fileBinry.seek(START_OF_CELL_HEADER);
+						fileBinry.writeShort((int) (currentPage * pageSize));
 
 					}
 					isDone = true;
@@ -667,6 +415,265 @@ public class BTree {
 		return isDone;
 	}
 
+	private void writeToInterior(int pageLocation, int pageNumber, int rowID,
+			int pageRight) {
+		try {
+
+			fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+			short No_OfCells = fileBinry.readByte();
+			if (No_OfCells < 49) {
+				fileBinry.seek(pageLocation * pageSize - pageSize + 4);
+				if (fileBinry.readInt() == pageNumber && pageRight != -1) {
+					fileBinry.seek(pageLocation * pageSize - pageSize + 4);
+					fileBinry.writeInt(pageRight);
+					long cellStartOffset = (pageLocation * (pageSize))
+							- (8 * (No_OfCells + 1));
+					fileBinry.seek(pageLocation * pageSize - pageSize + 2);
+					fileBinry.writeShort((int) cellStartOffset);
+					fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+					fileBinry.write(No_OfCells + 1);
+					fileBinry.seek(cellStartOffset);
+					fileBinry.writeInt(pageNumber);
+					fileBinry.writeInt(rowID);
+					fileBinry.seek((pageLocation * pageSize - pageSize + 8)
+							+ (2 * No_OfCells));
+					fileBinry.writeShort((short) cellStartOffset);
+				} else {
+					int flag = 0;
+					for (int i = 0; i < No_OfCells; i++) {
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * i));
+						fileBinry.seek(fileBinry.readUnsignedShort());
+						if (fileBinry.readInt() == pageNumber) {
+							flag = 1;
+							int tempRowID = fileBinry.readInt();
+							fileBinry
+									.seek((pageLocation * pageSize - pageSize + 8)
+											+ (2 * i));
+							fileBinry.seek(fileBinry.readUnsignedShort() + 4);
+							fileBinry.writeInt(rowID);
+							long cellStartOffset = (pageLocation * (pageSize))
+									- (8 * (No_OfCells + 1));
+							fileBinry.seek(pageLocation * pageSize - pageSize
+									+ 2);
+							fileBinry.writeShort((int) cellStartOffset);
+							fileBinry.seek(pageLocation * pageSize - pageSize
+									+ 1);
+							fileBinry.write(No_OfCells + 1);
+							fileBinry.seek(cellStartOffset);
+							fileBinry.writeInt(pageRight);
+							fileBinry.writeInt(tempRowID);
+							fileBinry.seek(pageLocation * pageSize - pageSize
+									+ 8 + 2 * No_OfCells);
+							fileBinry.writeShort((short) cellStartOffset);
+						}
+					}
+					if (flag == 0) {
+						long cellStartOffset = (pageLocation * (pageSize))
+								- (8 * (No_OfCells + 1));
+						fileBinry.seek(pageLocation * pageSize - pageSize + 2);
+						fileBinry.writeShort((int) cellStartOffset);
+						fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+						fileBinry.write(No_OfCells + 1);
+						fileBinry.seek(cellStartOffset);
+						fileBinry.writeInt(pageNumber);
+						fileBinry.writeInt(rowID);
+						fileBinry.seek(pageLocation * pageSize - pageSize + 8
+								+ 2 * No_OfCells);
+						fileBinry.writeShort((short) cellStartOffset);
+					}
+				}
+				int tempAddi, tempAddj, tempi, tempj;
+				for (int i = 0; i <= No_OfCells; i++)
+					for (int j = i + 1; j <= No_OfCells; j++) {
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * i));
+						tempAddi = fileBinry.readUnsignedShort();
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * j));
+						tempAddj = fileBinry.readUnsignedShort();
+						fileBinry.seek(tempAddi + 4);
+						tempi = fileBinry.readInt();
+						fileBinry.seek(tempAddj + 4);
+						tempj = fileBinry.readInt();
+						if (tempi > tempj) {
+							fileBinry
+									.seek((pageLocation * pageSize - pageSize + 8)
+											+ (2 * i));
+							fileBinry.writeShort(tempAddj);
+							fileBinry
+									.seek((pageLocation * pageSize - pageSize + 8)
+											+ (2 * j));
+							fileBinry.writeShort(tempAddi);
+
+						}
+					}
+			} else {
+				fileBinry.seek(pageLocation * pageSize - pageSize + 4);
+				if (fileBinry.readInt() == pageNumber && pageRight != -1) {
+					fileBinry.seek(pageLocation * pageSize - pageSize + 4);
+					fileBinry.writeInt(pageRight);
+					long cellStartOffset = (pageLocation * (pageSize))
+							- (8 * (No_OfCells + 1));
+					fileBinry.seek(pageLocation * pageSize - pageSize + 2);
+					fileBinry.writeShort((int) cellStartOffset);
+					fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+					fileBinry.write(No_OfCells + 1);
+					fileBinry.seek(cellStartOffset);
+					fileBinry.writeInt(pageNumber);
+					fileBinry.writeInt(rowID);
+					fileBinry.seek((pageLocation * pageSize - pageSize + 8)
+							+ (2 * No_OfCells));
+					fileBinry.writeShort((short) cellStartOffset);
+				} else {
+					int flag = 0;
+					for (int i = 0; i < No_OfCells; i++) {
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * i));
+						fileBinry.seek(fileBinry.readUnsignedShort());
+						if (fileBinry.readInt() == pageNumber) {
+							flag = 1;
+							int tempRowID = fileBinry.readInt();
+							fileBinry
+									.seek((pageLocation * pageSize - pageSize + 8)
+											+ (2 * i));
+							fileBinry.seek(fileBinry.readUnsignedShort() + 4);
+							fileBinry.writeInt(rowID);
+							long cellStartOffset = (pageLocation * (pageSize))
+									- (8 * (No_OfCells + 1));
+							fileBinry.seek(pageLocation * pageSize - pageSize
+									+ 2);
+							fileBinry.writeShort((int) cellStartOffset);
+							fileBinry.seek(pageLocation * pageSize - pageSize
+									+ 1);
+							fileBinry.write(No_OfCells + 1);
+							fileBinry.seek(cellStartOffset);
+							fileBinry.writeInt(pageRight);
+							fileBinry.writeInt(tempRowID);
+							fileBinry.seek(pageLocation * pageSize - pageSize
+									+ 8 + 2 * No_OfCells);
+							fileBinry.writeShort((short) cellStartOffset);
+						}
+					}
+					if (flag == 0) {
+						long cellStartOffset = (pageLocation * (pageSize))
+								- (8 * (No_OfCells + 1));
+						fileBinry.seek(pageLocation * pageSize - pageSize + 2);
+						fileBinry.writeShort((int) cellStartOffset);
+						fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+						fileBinry.write(No_OfCells + 1);
+						fileBinry.seek(cellStartOffset);
+						fileBinry.writeInt(pageNumber);
+						fileBinry.writeInt(rowID);
+						fileBinry.seek(pageLocation * pageSize - pageSize + 8
+								+ 2 * No_OfCells);
+						fileBinry.writeShort((short) cellStartOffset);
+					}
+				}
+				int tempAddi, tempAddj, tempi, tempj;
+				for (int i = 0; i <= No_OfCells; i++)
+					for (int j = i + 1; j <= No_OfCells; j++) {
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * i));
+						tempAddi = fileBinry.readUnsignedShort();
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * j));
+						tempAddj = fileBinry.readUnsignedShort();
+						fileBinry.seek(tempAddi + 4);
+						tempi = fileBinry.readInt();
+						fileBinry.seek(tempAddj + 4);
+						tempj = fileBinry.readInt();
+						if (tempi > tempj) {
+							fileBinry
+									.seek((pageLocation * pageSize - pageSize + 8)
+											+ (2 * i));
+							fileBinry.writeShort(tempAddj);
+							fileBinry
+									.seek((pageLocation * pageSize - pageSize + 8)
+											+ (2 * j));
+							fileBinry.writeShort(tempAddi);
+
+						}
+					}
+				if (pageLocation == 1) {
+					int x, y;
+					fileBinry.seek((pageLocation * pageSize - pageSize + 8)
+							+ (2 * 25));
+					fileBinry.seek(fileBinry.readUnsignedShort());
+					x = fileBinry.readInt();
+					y = fileBinry.readInt();
+					writePageHeader(lastPage + 1, false, 0, x);
+					for (int i = 0; i < 25; i++) {
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * i));
+						fileBinry.seek(fileBinry.readUnsignedShort());
+						writeToInterior(lastPage + 1, fileBinry.readInt(),
+								fileBinry.readInt(), -1);
+					}
+					fileBinry.seek(pageLocation * pageSize - pageSize + 4);
+					writePageHeader(lastPage + 2, false, 0,
+							fileBinry.readInt());
+					for (int i = 26; i < 50; i++) {
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * i));
+						fileBinry.seek(fileBinry.readUnsignedShort());
+						writeToInterior(lastPage + 2, fileBinry.readInt(),
+								fileBinry.readInt(), -1);
+					}
+					writePageHeader(1, false, 0, lastPage + 2);
+
+					writeToInterior(1, lastPage + 1, y, lastPage + 2);
+					lastPage += 2;
+
+				} else {
+
+					int x, y;
+					fileBinry.seek((pageLocation * pageSize - pageSize + 8)
+							+ (2 * 25));
+					fileBinry.seek(fileBinry.readUnsignedShort());
+					x = fileBinry.readInt();
+					y = fileBinry.readInt();
+					fileBinry.seek(pageLocation * pageSize - pageSize + 4);
+					writePageHeader(lastPage + 1, false, 0,
+							fileBinry.readInt());
+					fileBinry.seek(pageLocation * pageSize - pageSize + 4);
+					fileBinry.writeInt(x);
+					for (int i = 26; i < 50; i++) {
+						fileBinry
+								.seek((pageLocation * pageSize - pageSize + 8)
+										+ (2 * i));
+						fileBinry.seek(fileBinry.readUnsignedShort());
+						writeToInterior(lastPage + 1, fileBinry.readInt(),
+								fileBinry.readInt(), -1);
+
+					}
+
+					fileBinry.seek(pageLocation * pageSize - pageSize + 1);
+					fileBinry.write(25);
+
+					int lastInteriorPage = routeOfLeafPage
+							.remove(routeOfLeafPage.size() - 1);
+
+					writeToInterior(lastInteriorPage, pageLocation, y,
+							lastPage + 1);
+					lastPage++;
+
+				}
+			}
+
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+	}
+	
 	private void searchLeftMostLeafNode() {
 		routeOfLeafPage.add(currentPage);
 		readPageHeader(currentPage);
@@ -675,18 +682,18 @@ public class BTree {
 			return;
 		} else {
 			try {
-				binaryFile.seek(pageHeader_Offset_noOfCells);
+				fileBinry.seek(NO_OF_CELLS_HEADER);
 
-				int noOfColumns = binaryFile.readUnsignedByte();
+				int noOfColumns = fileBinry.readUnsignedByte();
 
-				binaryFile.seek(pageHeader_array_offset);
+				fileBinry.seek(pageHeader_array_offset);
 				int address;
 				if (noOfColumns > 0) {
 
-					address = binaryFile.readUnsignedShort();
+					address = fileBinry.readUnsignedShort();
 
-					binaryFile.seek(address);
-					int pageNumber = binaryFile.readInt();
+					fileBinry.seek(address);
+					int pageNumber = fileBinry.readInt();
 
 					currentPage = pageNumber;
 					searchLeftMostLeafNode();
@@ -699,7 +706,7 @@ public class BTree {
 
 	}
 
-	private void searchRightMostLeafNode() {
+	private void searchRMLNode() {
 
 		routeOfLeafPage.add(currentPage);
 		readPageHeader(currentPage);
@@ -709,11 +716,11 @@ public class BTree {
 			return;
 		} else {
 			try {
-				binaryFile.seek(pageHeader_Offset_rightPagePointer);
+				fileBinry.seek(pageHeader_Offset_rightPagePointer);
 
-				currentPage = binaryFile.readInt();
+				currentPage = fileBinry.readInt();
 
-				searchRightMostLeafNode();
+				searchRMLNode();
 
 			} catch (IOException e) {
 				System.out.println("Unexpected Error");
@@ -722,29 +729,7 @@ public class BTree {
 
 	}
 
-	public List<LinkedHashMap<String, ArrayList<String>>> searchNonPrimaryCol(
-			ArrayList<String> value) {
-		currentPage = 1;
-		List<LinkedHashMap<String, ArrayList<String>>> result = new ArrayList<LinkedHashMap<String, ArrayList<String>>>();
-		searchLeftMostLeafNode();
-		while (currentPage > 0) {
-			try {
-				readPageHeader(currentPage);
-				searchRecordsInTheCurrentPage(value, result);
-				// printRecordsInTheCurrentPage(result);
 
-				binaryFile.seek(pageHeader_Offset_rightPagePointer);
-
-				currentPage = binaryFile.readInt();
-
-			} catch (Exception e) {
-				System.out.println("Unexpected Error");
-			}
-		}
-
-		return result;
-
-	}
 
 	public List<LinkedHashMap<String, ArrayList<String>>> printAll() {
 		currentPage = 1;
@@ -753,11 +738,11 @@ public class BTree {
 		while (currentPage > 0) {
 			try {
 				readPageHeader(currentPage);
-				printRecordsInTheCurrentPage(result);
+				printCurrentPg(result);
 
-				binaryFile.seek(pageHeader_Offset_rightPagePointer);
+				fileBinry.seek(pageHeader_Offset_rightPagePointer);
 
-				currentPage = binaryFile.readInt();
+				currentPage = fileBinry.readInt();
 
 			} catch (Exception e) {
 				System.out.println("Unexpected Error");
@@ -767,22 +752,46 @@ public class BTree {
 
 	}
 
-	private void printRecordsInTheCurrentPage(
+	public List<LinkedHashMap<String, ArrayList<String>>> searchWithNonPK(
+			ArrayList<String> value) {
+		currentPage = 1;
+		List<LinkedHashMap<String, ArrayList<String>>> result = new ArrayList<LinkedHashMap<String, ArrayList<String>>>();
+		searchLeftMostLeafNode();
+		while (currentPage > 0) {
+			try {
+				readPageHeader(currentPage);
+				searchCurrentPg(value, result);
+				// printRecordsInTheCurrentPage(result);
+
+				fileBinry.seek(pageHeader_Offset_rightPagePointer);
+
+				currentPage = fileBinry.readInt();
+
+			} catch (Exception e) {
+				System.out.println("Unexpected Error");
+			}
+		}
+
+		return result;
+
+	}
+	
+	private void printCurrentPg(
 			List<LinkedHashMap<String, ArrayList<String>>> result)
 			throws Exception {
-		binaryFile.seek(pageHeader_Offset_noOfCells);
-		int noOfCol = binaryFile.readUnsignedByte();
+		fileBinry.seek(NO_OF_CELLS_HEADER);
+		int noOfCol = fileBinry.readUnsignedByte();
 
-		binaryFile.seek(pageHeader_array_offset);
-		long point = binaryFile.getFilePointer();
-		int address = binaryFile.readUnsignedShort();
+		fileBinry.seek(pageHeader_array_offset);
+		long point = fileBinry.getFilePointer();
+		int address = fileBinry.readUnsignedShort();
 
 		for (int i = 0; i < noOfCol; i++) {
 
-			binaryFile.seek(address);
+			fileBinry.seek(address);
 
-			binaryFile.readUnsignedShort();
-			int currentRowID = binaryFile.readInt();
+			fileBinry.readUnsignedShort();
+			int currentRowID = fileBinry.readInt();
 
 			LinkedHashMap<String, ArrayList<String>> token = null;
 			if (isColumnSchema) {
@@ -808,29 +817,29 @@ public class BTree {
 			result.add(populateData(address, token));
 
 			point = (point + 2);
-			binaryFile.seek(point);
-			address = binaryFile.readUnsignedShort();
+			fileBinry.seek(point);
+			address = fileBinry.readUnsignedShort();
 
 		}
 
 	}
 
-	private void searchRecordsInTheCurrentPage(ArrayList<String> searchCond,
+	private void searchCurrentPg(ArrayList<String> searchCond,
 			List<LinkedHashMap<String, ArrayList<String>>> result)
 			throws Exception {
-		binaryFile.seek(pageHeader_Offset_noOfCells);
-		int noOfCol = binaryFile.readUnsignedByte();
+		fileBinry.seek(NO_OF_CELLS_HEADER);
+		int noOfCol = fileBinry.readUnsignedByte();
 
-		binaryFile.seek(pageHeader_array_offset);
-		long point = binaryFile.getFilePointer();
-		int address = binaryFile.readUnsignedShort();
+		fileBinry.seek(pageHeader_array_offset);
+		long point = fileBinry.getFilePointer();
+		int address = fileBinry.readUnsignedShort();
 
 		for (int i = 0; i < noOfCol; i++) {
 
-			binaryFile.seek(address);
+			fileBinry.seek(address);
 
-			binaryFile.readUnsignedShort();
-			int currentRowID = binaryFile.readInt();
+			fileBinry.readUnsignedShort();
+			int currentRowID = fileBinry.readInt();
 			LinkedHashMap<String, ArrayList<String>> token = null;
 			if (isColumnSchema) {
 				token = new LinkedHashMap<String, ArrayList<String>>();
@@ -851,635 +860,38 @@ public class BTree {
 			} else {
 				token = mDBColumnFiletree.getSchema(tableName);
 			}
-			token = populateDataWithSearch(searchCond, address, token);
+			token = populateResult(searchCond, address, token);
 			if (token != null)
 				result.add(token);
 
 			point = (point + 2);
-			binaryFile.seek(point);
-			address = binaryFile.readUnsignedShort();
+			fileBinry.seek(point);
+			address = fileBinry.readUnsignedShort();
 
 		}
 
 	}
 
-	private LinkedHashMap<String, ArrayList<String>> populateDataWithSearch(
-			ArrayList<String> searchCond, long cellOffset,
-			LinkedHashMap<String, ArrayList<String>> token) {
 
-		ArrayList<String> arrayOfValues = new ArrayList<String>();
-		try {
-			binaryFile.seek(cellOffset);
-			int payLoadSize = binaryFile.readUnsignedShort();
-			Integer actualRowID = binaryFile.readInt();
-			short noOfColumns = binaryFile.readByte();
-			payLoadSize -= 1;
-			long offsetForSerialType = binaryFile.getFilePointer();
-			long offSetForData = (offsetForSerialType + noOfColumns);
 
-			boolean isMatch = false;
-			int i = 0;
-
-			String seachCol = searchCond.get(0);
-			String searchDataType = searchCond.get(1);
-			String serachVal = searchCond.get(2);
-
-			String value = null;
-
-			long offsetForSerialTypeMatch = offsetForSerialType;
-			long offSetForDataMatch = (offSetForData);
-
-			int colIndex = Integer.parseInt(seachCol);
-
-			int currentColIndex = 1;
-
-			for (String key : token.keySet()) {
-
-				binaryFile.seek(offsetForSerialType);
-				short b = binaryFile.readByte();
-				offsetForSerialType = binaryFile.getFilePointer();
-				if (b == 0) {
-
-					binaryFile.seek(offSetForData);
-					int p = (binaryFile.readUnsignedByte());
-					value = "NULL";
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				} else if (b == 1) {
-
-					binaryFile.seek(offSetForData);
-					int p = (binaryFile.readUnsignedShort());
-					value = "NULL";
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				} else if (b == 2) {
-					binaryFile.seek(offSetForData);
-					int p = (binaryFile.readInt());
-					value = "NULL";
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 3) {
-
-					binaryFile.seek(offSetForData);
-					int p = (int) (binaryFile.readDouble());
-					value = "NULL";
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				} else if (b == 12) {
-					value = "NULL";
-
-				} else if (b == 4) {
-					binaryFile.seek(offSetForData);
-					value = Integer.toString(binaryFile.readUnsignedByte());
-					offSetForData = binaryFile.getFilePointer();
-				} else if (b == 5) {
-					binaryFile.seek(offSetForData);
-					value = (Integer.toString(binaryFile.readUnsignedShort()));
-					offSetForData = binaryFile.getFilePointer();
-				} else if (b == 6) {
-					binaryFile.seek(offSetForData);
-					value = (Integer.toString(binaryFile.readInt()));
-					offSetForData = binaryFile.getFilePointer();
-				} else if (b == 7) {
-					binaryFile.seek(offSetForData);
-					value = (Long.toString(binaryFile.readLong()));
-					offSetForData = binaryFile.getFilePointer();
-				} else if (b == 8) {
-
-					binaryFile.seek(offSetForData);
-					value = (Float.toString(binaryFile.readFloat()));
-					offSetForData = binaryFile.getFilePointer();
-				} else if (b == 9) {
-
-					binaryFile.seek(offSetForData);
-					value = (Double.toString(binaryFile.readDouble()));
-					offSetForData = binaryFile.getFilePointer();
-
-				} else if (b == 10) {
-					binaryFile.seek(offSetForData);
-
-					long timeInEpoch = binaryFile.readLong();
-
-					value = Long.toString(timeInEpoch);
-					offSetForData = binaryFile.getFilePointer();
-				} else if (b == 11) {
-					binaryFile.seek(offSetForData);
-
-					long timeInEpoch = binaryFile.readLong();
-					value = Long.toString(timeInEpoch);
-
-					// value = (Long.toString(binaryFile.readLong()));
-					offSetForData = binaryFile.getFilePointer();
-				} else {
-					byte[] text = new byte[b - 12];
-					binaryFile.seek(offSetForData);
-
-					binaryFile.read(text);
-					value = (new String(text));
-					offSetForData = binaryFile.getFilePointer();
-
-				}
-
-				if (currentColIndex == colIndex) {
-
-					switch (searchDataType.trim().toLowerCase()) {
-
-					case TINYINT:
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null
-								&& value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-						} else if (value != null
-								&& serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& Integer.parseInt(serachVal) == Integer
-										.parseInt(value)) {
-							isMatch = true;
-						}
-						break;
-					case SMALLINT:
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null
-								&& value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-						} else if (value != null
-								&& serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& Integer.parseInt(serachVal) == Integer
-										.parseInt(value)) {
-							isMatch = true;
-						}
-						break;
-					case INT:
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null
-								&& value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-						} else if (value != null
-								&& serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& Integer.parseInt(serachVal) == Integer
-										.parseInt(value)) {
-							isMatch = true;
-						}
-						break;
-					case BIGINT:
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null
-								&& value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-						} else if (value != null
-								&& serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& Long.parseLong(serachVal) == Long
-										.parseLong(value)) {
-							isMatch = true;
-						}
-						break;
-					case REAL:
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null
-								&& value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-						} else if (value != null
-								&& serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& Float.parseFloat(serachVal) == Float
-										.parseFloat(value)) {
-							isMatch = true;
-						}
-						break;
-					case DOUBLE:
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null
-								&& value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-						} else if (value != null
-								&& serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& Double.parseDouble(serachVal) == Double
-										.parseDouble(value)) {
-							isMatch = true;
-						}
-						break;
-					case DATETIME:
-						long epochSeconds = 0;
-
-						if (value != null && value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-							break;
-						}
-
-						if (value != null && !value.equalsIgnoreCase("null")) {
-							SimpleDateFormat df = new SimpleDateFormat(
-									"yyyy-MM-dd_HH:mm:ss");
-
-							Date date;
-							try {
-								date = df.parse(serachVal);
-
-								ZonedDateTime zdt = ZonedDateTime.ofInstant(
-										date.toInstant(), zoneId);
-
-								epochSeconds = zdt.toInstant().toEpochMilli() / 1000;
-							} catch (Exception e) {
-
-							}
-
-						}
-
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null && serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& (epochSeconds) == Long.parseLong(value)) {
-
-							Instant ii = Instant.ofEpochSecond(epochSeconds);
-							ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii,
-									zoneId);
-							SimpleDateFormat sdf = new SimpleDateFormat(
-									"yyyy-MM-dd_HH:mm:ss");
-							Date date = Date.from(zdt2.toInstant());
-							value = sdf.format(date);
-
-							isMatch = true;
-						}
-						break;
-					case DATE2:
-						long epochSecondss = 0;
-						if (value != null && value.equalsIgnoreCase("null")
-								&& value.equalsIgnoreCase(serachVal)) {
-							isMatch = true;
-							break;
-						}
-
-						if (value != null && !value.equalsIgnoreCase("null")) {
-							SimpleDateFormat df = new SimpleDateFormat(
-									"yyyy-MM-dd");
-
-							Date date;
-							try {
-								date = df.parse(serachVal);
-
-								ZonedDateTime zdt = ZonedDateTime.ofInstant(
-										date.toInstant(), zoneId);
-
-								epochSecondss = zdt.toInstant().toEpochMilli() / 1000;
-							} catch (Exception e) {
-
-							}
-
-						}
-
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null && serachVal != null
-								&& !value.equalsIgnoreCase("null")
-								&& (epochSecondss) == Long.parseLong(value)) {
-
-							Instant ii = Instant.ofEpochSecond(epochSecondss);
-							ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii,
-									zoneId);
-							SimpleDateFormat sdf = new SimpleDateFormat(
-									"yyyy-MM-dd");
-							Date date = Date.from(zdt2.toInstant());
-							value = sdf.format(date);
-							isMatch = true;
-						}
-						break;
-					case TEXT:
-						if (value == null && value == serachVal) {
-							isMatch = true;
-						} else if (value != null && serachVal != null
-								&& serachVal.equalsIgnoreCase(value)) {
-							isMatch = true;
-						}
-
-						break;
-					}
-
-					break;
-				}
-				currentColIndex++;
-			}
-
-			if (isMatch) {
-				offsetForSerialType = offsetForSerialTypeMatch;
-				offSetForData = offSetForDataMatch;
-
-				for (String key : token.keySet()) {
-
-					if (i == 0) {
-						arrayOfValues.add(actualRowID.toString());
-						token.put(key, new ArrayList<String>(arrayOfValues));
-						i++;
-						arrayOfValues.clear();
-						continue;
-					}
-
-					binaryFile.seek(offsetForSerialType);
-					short b = binaryFile.readByte();
-					offsetForSerialType = binaryFile.getFilePointer();
-					if (b == 0) {
-
-						binaryFile.seek(offSetForData);
-						int p = (binaryFile.readUnsignedByte());
-						arrayOfValues.add("NULL");
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-
-					} else if (b == 1) {
-
-						binaryFile.seek(offSetForData);
-						int p = (binaryFile.readUnsignedShort());
-						arrayOfValues.add("NULL");
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-
-					} else if (b == 2) {
-						binaryFile.seek(offSetForData);
-						int p = (binaryFile.readInt());
-						arrayOfValues.add("NULL");
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 3) {
-
-						binaryFile.seek(offSetForData);
-						int p = (int) (binaryFile.readDouble());
-						arrayOfValues.add("NULL");
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-
-					} else if (b == 12) {
-						arrayOfValues.add("NULL");
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 4) {
-						binaryFile.seek(offSetForData);
-						arrayOfValues.add(Integer.toString(binaryFile
-								.readUnsignedByte()));
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 5) {
-						binaryFile.seek(offSetForData);
-						arrayOfValues.add(Integer.toString(binaryFile
-								.readUnsignedShort()));
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 6) {
-						binaryFile.seek(offSetForData);
-						arrayOfValues
-								.add(Integer.toString(binaryFile.readInt()));
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 7) {
-						binaryFile.seek(offSetForData);
-						arrayOfValues.add(Long.toString(binaryFile.readLong()));
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 8) {
-
-						binaryFile.seek(offSetForData);
-						arrayOfValues
-								.add(Float.toString(binaryFile.readFloat()));
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 9) {
-
-						binaryFile.seek(offSetForData);
-						arrayOfValues.add(Double.toString(binaryFile
-								.readDouble()));
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-
-					} else if (b == 10) {
-						binaryFile.seek(offSetForData);
-
-						Instant ii = Instant.ofEpochSecond(binaryFile
-								.readLong());
-						ZonedDateTime zdt2 = ZonedDateTime
-								.ofInstant(ii, zoneId);
-						SimpleDateFormat sdf = new SimpleDateFormat(
-								"yyyy-MM-dd_HH:mm:ss");
-						Date date = Date.from(zdt2.toInstant());
-						arrayOfValues.add(sdf.format(date));
-
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else if (b == 11) {
-						binaryFile.seek(offSetForData);
-						// arrayOfValues.add(Long.toString(binaryFile.readLong()));
-
-						Instant ii = Instant.ofEpochSecond(binaryFile
-								.readLong());
-						ZonedDateTime zdt2 = ZonedDateTime
-								.ofInstant(ii, zoneId);
-						SimpleDateFormat sdf = new SimpleDateFormat(
-								"yyyy-MM-dd");
-						Date date = Date.from(zdt2.toInstant());
-
-						arrayOfValues.add(sdf.format(date));
-
-						offSetForData = binaryFile.getFilePointer();
-						token.put(key, new ArrayList<String>(arrayOfValues));
-					} else {
-						byte[] text = new byte[b - 12];
-						binaryFile.seek(offSetForData);
-
-						binaryFile.read(text);
-						arrayOfValues.add(new String(text));
-						offSetForData = binaryFile.getFilePointer();
-
-						token.put(key, new ArrayList<String>(arrayOfValues));
-
-					}
-					arrayOfValues.clear();
-				}
-			}
-
-			if (!isMatch)
-				token = null;
-
-		} catch (Exception e) {
-			System.out.println("Unexpected Error");
-		}
-
-		return token;
-	}
-
-	private LinkedHashMap<String, ArrayList<String>> populateData(
-			long cellOffset, LinkedHashMap<String, ArrayList<String>> token) {
-
-		ArrayList<String> arrayOfValues = new ArrayList<String>();
-		try {
-			binaryFile.seek(cellOffset);
-			int payLoadSize = binaryFile.readUnsignedShort();
-			Integer actualRowID = binaryFile.readInt();
-			short noOfColumns = binaryFile.readByte();
-			payLoadSize -= 1;
-			long offsetForSerialType = binaryFile.getFilePointer();
-			long offSetForData = (offsetForSerialType + noOfColumns);
-			int i = 0;
-			for (String key : token.keySet()) {
-
-				if (i == 0) {
-					arrayOfValues.add(actualRowID.toString());
-					token.put(key, new ArrayList<String>(arrayOfValues));
-					i++;
-					arrayOfValues.clear();
-					continue;
-				}
-
-				binaryFile.seek(offsetForSerialType);
-				short b = binaryFile.readByte();
-				offsetForSerialType = binaryFile.getFilePointer();
-
-				if (b == 0) {
-
-					binaryFile.seek(offSetForData);
-					int p = (binaryFile.readUnsignedByte());
-					arrayOfValues.add("NULL");
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				} else if (b == 1) {
-
-					binaryFile.seek(offSetForData);
-					int p = (binaryFile.readUnsignedShort());
-					arrayOfValues.add("NULL");
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				} else if (b == 2) {
-					binaryFile.seek(offSetForData);
-					int p = (binaryFile.readInt());
-					arrayOfValues.add("NULL");
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 3) {
-
-					binaryFile.seek(offSetForData);
-					int p = (int) (binaryFile.readDouble());
-					arrayOfValues.add("NULL");
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				} else if (b == 12) {
-					arrayOfValues.add("NULL");
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 4) {
-					binaryFile.seek(offSetForData);
-					arrayOfValues.add(Integer.toString(binaryFile
-							.readUnsignedByte()));
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 5) {
-					binaryFile.seek(offSetForData);
-					arrayOfValues.add(Integer.toString(binaryFile
-							.readUnsignedShort()));
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 6) {
-					binaryFile.seek(offSetForData);
-					arrayOfValues.add(Integer.toString(binaryFile.readInt()));
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 7) {
-					binaryFile.seek(offSetForData);
-					arrayOfValues.add(Long.toString(binaryFile.readLong()));
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 8) {
-
-					binaryFile.seek(offSetForData);
-					arrayOfValues.add(Float.toString(binaryFile.readFloat()));
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 9) {
-
-					binaryFile.seek(offSetForData);
-					arrayOfValues.add(Double.toString(binaryFile.readDouble()));
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				} else if (b == 10) {
-					binaryFile.seek(offSetForData);
-					// arrayOfValues.add(Long.toString(binaryFile.readLong()));
-
-					long timeInEpoch = binaryFile.readLong();
-					Instant ii = Instant.ofEpochSecond(timeInEpoch);
-					ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii, zoneId);
-					SimpleDateFormat sdf = new SimpleDateFormat(
-							"yyyy-MM-dd_HH:mm:ss");
-					Date date = Date.from(zdt2.toInstant());
-					arrayOfValues.add(sdf.format(date));
-
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else if (b == 11) {
-					binaryFile.seek(offSetForData);
-					long timeInEpoch = binaryFile.readLong();
-					Instant ii = Instant.ofEpochSecond(timeInEpoch);
-					ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii, zoneId);
-					SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
-					Date date = Date.from(zdt2.toInstant());
-					arrayOfValues.add(sdf.format(date));
-					offSetForData = binaryFile.getFilePointer();
-					token.put(key, new ArrayList<String>(arrayOfValues));
-				} else {
-					byte[] text = new byte[b - 12];
-					binaryFile.seek(offSetForData);
-
-					binaryFile.read(text);
-					arrayOfValues.add(new String(text));
-					offSetForData = binaryFile.getFilePointer();
-
-					token.put(key, new ArrayList<String>(arrayOfValues));
-
-				}
-				arrayOfValues.clear();
-			}
-
-		} catch (Exception e) {
-			System.out.println("Unexpected Error");
-		}
-
-		return token;
-	}
-
+	
 	private long[] getCellOffset(int rowId) {
 		long[] retVal = new long[2];
 		int cellOffset = -1;
 		try {
-			binaryFile.seek(pageHeader_Offset_noOfCells);
+			fileBinry.seek(NO_OF_CELLS_HEADER);
 
-			int noOfColumns = binaryFile.readUnsignedByte();
+			int noOfColumns = fileBinry.readUnsignedByte();
 
-			binaryFile.seek(pageHeader_array_offset);
-			long point = binaryFile.getFilePointer();
-			int address = binaryFile.readUnsignedShort();
+			fileBinry.seek(pageHeader_array_offset);
+			long point = fileBinry.getFilePointer();
+			int address = fileBinry.readUnsignedShort();
 			for (int i = 0; i < noOfColumns; i++) {
 
-				binaryFile.seek(address);
+				fileBinry.seek(address);
 
-				binaryFile.readUnsignedShort();
-				int currentRowID = binaryFile.readInt();
+				fileBinry.readUnsignedShort();
+				int currentRowID = fileBinry.readInt();
 
 				if (rowId == currentRowID) {
 					cellOffset = address;
@@ -1490,8 +902,8 @@ public class BTree {
 				} else {
 
 					point = (point + 2);
-					binaryFile.seek(point);
-					address = binaryFile.readUnsignedShort();
+					fileBinry.seek(point);
+					address = fileBinry.readUnsignedShort();
 				}
 
 			}
@@ -1504,7 +916,7 @@ public class BTree {
 	}
 
 	public boolean isEmptyTable() throws IOException {
-		return binaryFile.length() == 0;
+		return fileBinry.length() == 0;
 	}
 
 	public void insertNewRecord(Map<String, ArrayList<String>> token)
@@ -1533,9 +945,9 @@ public class BTree {
 		long no_of_Bytes = payloadSizeInBytes(token);
 		long cellStartOffset = 0;
 		try {
-			binaryFile.seek(pageHeader_Offset_startOfCell);
+			fileBinry.seek(START_OF_CELL_HEADER);
 
-			cellStartOffset = ((long) binaryFile.readUnsignedShort())
+			cellStartOffset = ((long) fileBinry.readUnsignedShort())
 					- (no_of_Bytes + 6);
 
 		} catch (IOException e) {
@@ -1546,8 +958,8 @@ public class BTree {
 			LinkedList<byte[]> page1Cells = new LinkedList<>();
 			LinkedList<byte[]> page2Cells = new LinkedList<>();
 			try {
-				binaryFile.seek(pageHeader_Offset_noOfCells);
-				int no_of_Cells = binaryFile.readUnsignedByte();
+				fileBinry.seek(NO_OF_CELLS_HEADER);
+				int no_of_Cells = fileBinry.readUnsignedByte();
 
 				int splitCells = no_of_Cells / 2;
 				int loc = 0;
@@ -1556,20 +968,20 @@ public class BTree {
 
 				long point = pageHeader_offset - 2;
 
-				binaryFile.seek(point);
+				fileBinry.seek(point);
 
-				binaryFile.seek(binaryFile.readUnsignedShort());
+				fileBinry.seek(fileBinry.readUnsignedShort());
 
-				binaryFile.readUnsignedShort();
+				fileBinry.readUnsignedShort();
 
-				int currenRowID = binaryFile.readInt();
+				int currenRowID = fileBinry.readInt();
 				while ((currenRowID > rowId)) {
 					splitCells++;
 					point = point - 2;
-					binaryFile.seek(point);
-					binaryFile.seek(binaryFile.readUnsignedShort());
-					binaryFile.readUnsignedShort();
-					currenRowID = binaryFile.readInt();
+					fileBinry.seek(point);
+					fileBinry.seek(fileBinry.readUnsignedShort());
+					fileBinry.readUnsignedShort();
+					currenRowID = fileBinry.readInt();
 				}
 
 				if (point == pageHeader_offset - 2) {
@@ -1579,18 +991,18 @@ public class BTree {
 						point = pageHeader_array_offset;
 						for (int i = 1; i <= no_of_Cells; i++) {
 
-							binaryFile.seek(point);
-							loc = binaryFile.readUnsignedShort();
+							fileBinry.seek(point);
+							loc = fileBinry.readUnsignedShort();
 
-							binaryFile.seek(point);
-							binaryFile.writeShort(0);
+							fileBinry.seek(point);
+							fileBinry.writeShort(0);
 
-							point = binaryFile.getFilePointer();
+							point = fileBinry.getFilePointer();
 
-							binaryFile.seek(loc);
-							binaryFile.readUnsignedShort();
+							fileBinry.seek(loc);
+							fileBinry.readUnsignedShort();
 
-							binaryFile.seek(loc);
+							fileBinry.seek(loc);
 							byte[] cell = readCell(loc);
 							page1Cells.add(cell);
 
@@ -1605,18 +1017,18 @@ public class BTree {
 						point = pageHeader_array_offset;
 						for (int i = 1; i <= no_of_Cells - splitCells; i++) {
 
-							binaryFile.seek(point);
-							loc = binaryFile.readUnsignedShort();
+							fileBinry.seek(point);
+							loc = fileBinry.readUnsignedShort();
 
-							binaryFile.seek(point);
-							binaryFile.writeShort(0);
+							fileBinry.seek(point);
+							fileBinry.writeShort(0);
 
-							point = binaryFile.getFilePointer();
+							point = fileBinry.getFilePointer();
 
-							binaryFile.seek(loc);
-							binaryFile.readUnsignedShort();
+							fileBinry.seek(loc);
+							fileBinry.readUnsignedShort();
 
-							binaryFile.seek(loc);
+							fileBinry.seek(loc);
 							byte[] cell = readCell(loc);
 
 							page1Cells.add(cell);
@@ -1626,13 +1038,13 @@ public class BTree {
 					for (int i = splitCells; i <= 1; i--) {
 
 						point = pageHeader_offset - (2 * i);
-						binaryFile.seek(point);
-						loc = binaryFile.readUnsignedShort();
+						fileBinry.seek(point);
+						loc = fileBinry.readUnsignedShort();
 
-						binaryFile.seek(point);
-						binaryFile.writeShort(0);
+						fileBinry.seek(point);
+						fileBinry.writeShort(0);
 
-						binaryFile.seek(loc);
+						fileBinry.seek(loc);
 						byte[] cell = readCell(loc);
 
 						page2Cells.add(cell);
@@ -1647,22 +1059,22 @@ public class BTree {
 				}
 
 				if (splitCells > 0) {
-					binaryFile.seek(pageHeader_Offset_noOfCells);
-					int noOfcells = binaryFile.readUnsignedByte();
-					binaryFile.seek(pageHeader_Offset_noOfCells);
-					binaryFile.writeByte(noOfcells - splitCells);
+					fileBinry.seek(NO_OF_CELLS_HEADER);
+					int noOfcells = fileBinry.readUnsignedByte();
+					fileBinry.seek(NO_OF_CELLS_HEADER);
+					fileBinry.writeByte(noOfcells - splitCells);
 				}
 
 				// split the page;
 				int[] pageNumbers = splitLeafPage(page1Cells, page2Cells);
 
 				// write Right Sibling for both pages
-				binaryFile.seek(((pageNumbers[0] * pageSize) - pageSize) + 4);
-				int prevRight = binaryFile.readInt();
-				binaryFile.seek(((pageNumbers[0] * pageSize) - pageSize) + 4);
-				binaryFile.writeInt(pageNumbers[1]);
-				binaryFile.seek(((pageNumbers[1] * pageSize) - pageSize) + 4);
-				binaryFile.writeInt(prevRight);
+				fileBinry.seek(((pageNumbers[0] * pageSize) - pageSize) + 4);
+				int prevRight = fileBinry.readInt();
+				fileBinry.seek(((pageNumbers[0] * pageSize) - pageSize) + 4);
+				fileBinry.writeInt(pageNumbers[1]);
+				fileBinry.seek(((pageNumbers[1] * pageSize) - pageSize) + 4);
+				fileBinry.writeInt(prevRight);
 
 				// ch16PageFileExample.displayBinaryHex(binaryFile);
 
@@ -1672,7 +1084,7 @@ public class BTree {
 						&& routeOfLeafPage.get(routeOfLeafPage.size() - 1) > 0) {
 
 					// if interior page exist
-					writeCellInterior(
+					writeToInterior(
 							routeOfLeafPage.remove(routeOfLeafPage.size() - 1),
 							pageNumbers[0], rowIdMiddle, pageNumbers[1]);
 
@@ -1710,20 +1122,20 @@ public class BTree {
 			return true;
 		} else {
 			try {
-				binaryFile.seek(pageHeader_Offset_noOfCells);
+				fileBinry.seek(NO_OF_CELLS_HEADER);
 
-				int noOfColumns = binaryFile.readUnsignedByte();
+				int noOfColumns = fileBinry.readUnsignedByte();
 
-				binaryFile.seek(pageHeader_array_offset);
-				long currentArrayElementOffset = binaryFile.getFilePointer();
+				fileBinry.seek(pageHeader_array_offset);
+				long currentArrayElementOffset = fileBinry.getFilePointer();
 				int address;
 				for (int i = 0; i < noOfColumns; i++) {
-					binaryFile.seek(currentArrayElementOffset);
-					address = binaryFile.readUnsignedShort();
-					currentArrayElementOffset = binaryFile.getFilePointer();
-					binaryFile.seek(address);
-					int pageNumber = binaryFile.readInt();
-					int delimiterRowId = binaryFile.readInt();
+					fileBinry.seek(currentArrayElementOffset);
+					address = fileBinry.readUnsignedShort();
+					currentArrayElementOffset = fileBinry.getFilePointer();
+					fileBinry.seek(address);
+					int pageNumber = fileBinry.readInt();
+					int delimiterRowId = fileBinry.readInt();
 					if (rowId < delimiterRowId) {
 						currentPage = pageNumber;
 						isFound = searchLeafPage(rowId, false);
@@ -1733,8 +1145,8 @@ public class BTree {
 				}
 
 				if (!isFound) {
-					binaryFile.seek(pageHeader_Offset_rightPagePointer);
-					currentPage = binaryFile.readInt();
+					fileBinry.seek(pageHeader_Offset_rightPagePointer);
+					currentPage = fileBinry.readInt();
 					isFound = searchLeafPage(rowId, false);
 				}
 
@@ -1749,16 +1161,16 @@ public class BTree {
 	private byte[] readCell(int loc) {
 
 		try {
-			binaryFile.seek(loc);
+			fileBinry.seek(loc);
 
-			int payloadLength = binaryFile.readUnsignedShort();
+			int payloadLength = fileBinry.readUnsignedShort();
 
 			byte[] b = new byte[6 + payloadLength];
-			binaryFile.seek(loc);
+			fileBinry.seek(loc);
 
-			binaryFile.read(b);
-			binaryFile.seek(loc);
-			binaryFile.write(new byte[6 + payloadLength]);
+			fileBinry.read(b);
+			fileBinry.seek(loc);
+			fileBinry.write(new byte[6 + payloadLength]);
 
 			return b;
 		} catch (Exception e) {
@@ -1768,6 +1180,148 @@ public class BTree {
 		return null;
 
 	}
+	
+	private LinkedHashMap<String, ArrayList<String>> populateData(
+			long cellOffset, LinkedHashMap<String, ArrayList<String>> token) {
+
+		ArrayList<String> arrayOfValues = new ArrayList<String>();
+		try {
+			fileBinry.seek(cellOffset);
+			int payLoadSize = fileBinry.readUnsignedShort();
+			Integer actualRowID = fileBinry.readInt();
+			short noOfColumns = fileBinry.readByte();
+			payLoadSize -= 1;
+			long offsetForSerialType = fileBinry.getFilePointer();
+			long offSetForData = (offsetForSerialType + noOfColumns);
+			int i = 0;
+			for (String key : token.keySet()) {
+
+				if (i == 0) {
+					arrayOfValues.add(actualRowID.toString());
+					token.put(key, new ArrayList<String>(arrayOfValues));
+					i++;
+					arrayOfValues.clear();
+					continue;
+				}
+
+				fileBinry.seek(offsetForSerialType);
+				short b = fileBinry.readByte();
+				offsetForSerialType = fileBinry.getFilePointer();
+
+				if (b == 0) {
+
+					fileBinry.seek(offSetForData);
+					int p = (fileBinry.readUnsignedByte());
+					arrayOfValues.add("NULL");
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				} else if (b == 1) {
+
+					fileBinry.seek(offSetForData);
+					int p = (fileBinry.readUnsignedShort());
+					arrayOfValues.add("NULL");
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				} else if (b == 2) {
+					fileBinry.seek(offSetForData);
+					int p = (fileBinry.readInt());
+					arrayOfValues.add("NULL");
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 3) {
+
+					fileBinry.seek(offSetForData);
+					int p = (int) (fileBinry.readDouble());
+					arrayOfValues.add("NULL");
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				} else if (b == 12) {
+					arrayOfValues.add("NULL");
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 4) {
+					fileBinry.seek(offSetForData);
+					arrayOfValues.add(Integer.toString(fileBinry
+							.readUnsignedByte()));
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 5) {
+					fileBinry.seek(offSetForData);
+					arrayOfValues.add(Integer.toString(fileBinry
+							.readUnsignedShort()));
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 6) {
+					fileBinry.seek(offSetForData);
+					arrayOfValues.add(Integer.toString(fileBinry.readInt()));
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 7) {
+					fileBinry.seek(offSetForData);
+					arrayOfValues.add(Long.toString(fileBinry.readLong()));
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 8) {
+
+					fileBinry.seek(offSetForData);
+					arrayOfValues.add(Float.toString(fileBinry.readFloat()));
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 9) {
+
+					fileBinry.seek(offSetForData);
+					arrayOfValues.add(Double.toString(fileBinry.readDouble()));
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				} else if (b == 10) {
+					fileBinry.seek(offSetForData);
+					// arrayOfValues.add(Long.toString(binaryFile.readLong()));
+
+					long timeInEpoch = fileBinry.readLong();
+					Instant ii = Instant.ofEpochSecond(timeInEpoch);
+					ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii, zoneId);
+					SimpleDateFormat sdf = new SimpleDateFormat(
+							"yyyy-MM-dd_HH:mm:ss");
+					Date date = Date.from(zdt2.toInstant());
+					arrayOfValues.add(sdf.format(date));
+
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 11) {
+					fileBinry.seek(offSetForData);
+					long timeInEpoch = fileBinry.readLong();
+					Instant ii = Instant.ofEpochSecond(timeInEpoch);
+					ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii, zoneId);
+					SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+					Date date = Date.from(zdt2.toInstant());
+					arrayOfValues.add(sdf.format(date));
+					offSetForData = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else {
+					byte[] text = new byte[b - 12];
+					fileBinry.seek(offSetForData);
+
+					fileBinry.read(text);
+					arrayOfValues.add(new String(text));
+					offSetForData = fileBinry.getFilePointer();
+
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				}
+				arrayOfValues.clear();
+			}
+
+		} catch (Exception e) {
+			System.out.println("Unexpected Error");
+		}
+
+		return token;
+	}
+
 
 	private int[] splitLeafPage(LinkedList<byte[]> page1Cells,
 			LinkedList<byte[]> page2Cells) {
@@ -1780,16 +1334,16 @@ public class BTree {
 				pageNumbers[0] = currentPage;
 				pageHeader_offset = pageHeader_array_offset;
 				if (page1Cells.size() > 0) {
-					binaryFile.seek(pageHeader_Offset_startOfCell);
-					binaryFile.writeShort(currentPage * (pageSize));
+					fileBinry.seek(START_OF_CELL_HEADER);
+					fileBinry.writeShort(currentPage * (pageSize));
 				}
 				for (byte[] s : page1Cells) {
 
 					long cellStartOffset = 0;
 
-					binaryFile.seek(pageHeader_Offset_startOfCell);
+					fileBinry.seek(START_OF_CELL_HEADER);
 
-					cellStartOffset = ((long) binaryFile.readUnsignedShort())
+					cellStartOffset = ((long) fileBinry.readUnsignedShort())
 							- (s.length);
 					writeCellInBytes(currentPage, s, cellStartOffset);
 
@@ -1824,13 +1378,13 @@ public class BTree {
 			long no_of_Bytes) {
 
 		try {
-			binaryFile.seek(pageHeader_Offset_startOfCell);
-			binaryFile.writeShort((int) cellStartOffset);
+			fileBinry.seek(START_OF_CELL_HEADER);
+			fileBinry.writeShort((int) cellStartOffset);
 
-			binaryFile.seek(pageHeader_Offset_noOfCells);
-			short current_Cell_size = binaryFile.readByte();
-			binaryFile.seek(pageHeader_Offset_noOfCells);
-			binaryFile.write(current_Cell_size + 1);
+			fileBinry.seek(NO_OF_CELLS_HEADER);
+			short current_Cell_size = fileBinry.readByte();
+			fileBinry.seek(NO_OF_CELLS_HEADER);
+			fileBinry.write(current_Cell_size + 1);
 
 		} catch (IOException e1) {
 			e1.printStackTrace();
@@ -1839,13 +1393,13 @@ public class BTree {
 		writeToHeaderArray(cellStartOffset,
 				Integer.parseInt(token.get(tableKey).get(1)));
 		try {
-			binaryFile.seek(cellStartOffset);
+			fileBinry.seek(cellStartOffset);
 			/**
 			 * Write cell header
 			 */
 			int rowId_or_pageNo = Integer.parseInt(token.get(tableKey).get(1));
-			binaryFile.writeShort((int) no_of_Bytes);
-			binaryFile.writeInt(rowId_or_pageNo);
+			fileBinry.writeShort((int) no_of_Bytes);
+			fileBinry.writeInt(rowId_or_pageNo);
 		} catch (IOException e) {
 			System.out.println("Unexpected Error");
 		}
@@ -1857,8 +1411,8 @@ public class BTree {
 			long cellStartOffset) {
 
 		try {
-			binaryFile.seek(pageHeader_Offset_startOfCell);
-			binaryFile.writeShort((int) cellStartOffset);
+			fileBinry.seek(START_OF_CELL_HEADER);
+			fileBinry.writeShort((int) cellStartOffset);
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
@@ -1866,8 +1420,8 @@ public class BTree {
 		int id = java.nio.ByteBuffer.wrap(rowId).getInt();
 		writeToHeaderArray(cellStartOffset, id);
 		try {
-			binaryFile.seek(cellStartOffset);
-			binaryFile.write(b);
+			fileBinry.seek(cellStartOffset);
+			fileBinry.write(b);
 		} catch (IOException e) {
 			System.out.println("Unexpected Error");
 		}
@@ -1921,29 +1475,29 @@ public class BTree {
 	private void writeToHeaderArray(long cellStartOffset, int rowID) {
 
 		try {
-			binaryFile.seek(pageHeader_Offset_noOfCells);
-			int No_OfCells = binaryFile.readUnsignedByte();
+			fileBinry.seek(NO_OF_CELLS_HEADER);
+			int No_OfCells = fileBinry.readUnsignedByte();
 			// pageHeader_offset = binaryFile.getFilePointer();
 
 			int pos = 0;
 			for (int i = 0; i < No_OfCells; i++) {
-				binaryFile.seek((currentPage * pageSize - pageSize + 8)
+				fileBinry.seek((currentPage * pageSize - pageSize + 8)
 						+ (2 * i));
-				binaryFile.seek(binaryFile.readUnsignedShort() + 2);
-				if (rowID < binaryFile.readInt()) {
+				fileBinry.seek(fileBinry.readUnsignedShort() + 2);
+				if (rowID < fileBinry.readInt()) {
 					pos = i;
 					break;
 				}
 			}
 			while (pos < No_OfCells) {
-				binaryFile.seek((currentPage * pageSize - pageSize + 8)
+				fileBinry.seek((currentPage * pageSize - pageSize + 8)
 						+ (2 * (No_OfCells - 1)));
-				binaryFile.writeShort(binaryFile.readUnsignedShort());
+				fileBinry.writeShort(fileBinry.readUnsignedShort());
 				No_OfCells--;
 			}
-			binaryFile.seek((currentPage * pageSize - pageSize + 8)
+			fileBinry.seek((currentPage * pageSize - pageSize + 8)
 					+ (2 * (pos)));
-			binaryFile.writeShort((int) cellStartOffset);
+			fileBinry.writeShort((int) cellStartOffset);
 
 		}
 
@@ -1956,9 +1510,9 @@ public class BTree {
 			Map<String, ArrayList<String>> token) {
 		try {
 
-			binaryFile.write(token.size() - 1);// no of columns
+			fileBinry.write(token.size() - 1);// no of columns
 
-			writeSerialCodeType(token);
+			writeSrl(token);
 
 			writePayload(token);
 		} catch (Exception e) {
@@ -1982,9 +1536,9 @@ public class BTree {
 			case TINYINT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(Integer.parseInt(data_type.get(1)));
+					fileBinry.write(Integer.parseInt(data_type.get(1)));
 				} else {
-					binaryFile.write(128);
+					fileBinry.write(128);
 
 				}
 
@@ -1992,45 +1546,45 @@ public class BTree {
 			case SMALLINT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.writeShort(Integer.parseInt(data_type.get(1)));
+					fileBinry.writeShort(Integer.parseInt(data_type.get(1)));
 				} else {
-					binaryFile.writeShort(-1);
+					fileBinry.writeShort(-1);
 				}
 
 				break;
 			case INT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.writeInt(Integer.parseInt(data_type.get(1)));
+					fileBinry.writeInt(Integer.parseInt(data_type.get(1)));
 				} else {
-					binaryFile.writeInt(-1);
+					fileBinry.writeInt(-1);
 				}
 				break;
 			case BIGINT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.writeLong(Long.parseLong(data_type.get(1)));
+					fileBinry.writeLong(Long.parseLong(data_type.get(1)));
 				} else {
-					binaryFile.writeLong(-1);
+					fileBinry.writeLong(-1);
 				}
 
 				break;
 			case REAL:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.writeFloat(Float.parseFloat((data_type.get(1))));
+					fileBinry.writeFloat(Float.parseFloat((data_type.get(1))));
 				} else {
-					binaryFile.writeFloat(-1);
+					fileBinry.writeFloat(-1);
 				}
 
 				break;
 			case DOUBLE:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile
+					fileBinry
 							.writeDouble(Double.parseDouble((data_type.get(1))));
 				} else {
-					binaryFile.writeDouble(-1);
+					fileBinry.writeDouble(-1);
 				}
 
 				break;
@@ -2050,12 +1604,12 @@ public class BTree {
 
 						long epochSeconds = zdt.toInstant().toEpochMilli() / 1000;
 
-						binaryFile.writeLong(epochSeconds);
+						fileBinry.writeLong(epochSeconds);
 					} catch (ParseException e) {
 						System.out.println("Unexpected Error");
 					}
 				} else {
-					binaryFile.writeLong(-1);
+					fileBinry.writeLong(-1);
 
 				}
 
@@ -2075,12 +1629,12 @@ public class BTree {
 
 						long epochSeconds = zdt.toInstant().toEpochMilli() / 1000;
 
-						binaryFile.writeLong(epochSeconds);
+						fileBinry.writeLong(epochSeconds);
 					} catch (ParseException e) {
 						System.out.println("Unexpected Error");
 					}
 				} else {
-					binaryFile.writeLong(-1);
+					fileBinry.writeLong(-1);
 
 				}
 
@@ -2090,7 +1644,7 @@ public class BTree {
 					String s = data_type.get(1);
 					byte[] b = s.getBytes("UTF-8");
 					for (byte bb : b)
-						binaryFile.write(bb);
+						fileBinry.write(bb);
 				}
 
 				break;
@@ -2100,7 +1654,562 @@ public class BTree {
 		}
 	}
 
-	private void writeSerialCodeType(Map<String, ArrayList<String>> token)
+	private LinkedHashMap<String, ArrayList<String>> populateResult(
+			ArrayList<String> searchCond, long cellOffset,
+			LinkedHashMap<String, ArrayList<String>> token) {
+
+		ArrayList<String> arrayOfValues = new ArrayList<String>();
+		try {
+			fileBinry.seek(cellOffset);
+			int payLoadSize = fileBinry.readUnsignedShort();
+			Integer actualRowID = fileBinry.readInt();
+			short noOfColumns = fileBinry.readByte();
+			payLoadSize -= 1;
+			long offsetForSerialType = fileBinry.getFilePointer();
+			long offset = (offsetForSerialType + noOfColumns);
+
+			boolean matchFound = false;
+			int i = 0;
+
+			String seachCol = searchCond.get(0);
+			String searchDataType = searchCond.get(1);
+			String valueToBeSearched = searchCond.get(2);
+
+			String value = null;
+
+			long offsetForSerialTypeMatch = offsetForSerialType;
+			long offSetForDataMatch = (offset);
+
+			int colIndex = Integer.parseInt(seachCol);
+
+			int currentColIndex = 1;
+
+			for (String key : token.keySet()) {
+
+				fileBinry.seek(offsetForSerialType);
+				short b = fileBinry.readByte();
+				offsetForSerialType = fileBinry.getFilePointer();
+				if (b == 0) {
+
+					fileBinry.seek(offset);
+					int p = (fileBinry.readUnsignedByte());
+					value = "NULL";
+					offset = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				} else if (b == 1) {
+
+					fileBinry.seek(offset);
+					int p = (fileBinry.readUnsignedShort());
+					value = "NULL";
+					offset = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				} else if (b == 2) {
+					fileBinry.seek(offset);
+					int p = (fileBinry.readInt());
+					value = "NULL";
+					offset = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+				} else if (b == 3) {
+
+					fileBinry.seek(offset);
+					int p = (int) (fileBinry.readDouble());
+					value = "NULL";
+					offset = fileBinry.getFilePointer();
+					token.put(key, new ArrayList<String>(arrayOfValues));
+
+				} else if (b == 12) {
+					value = "NULL";
+
+				} else if (b == 4) {
+					fileBinry.seek(offset);
+					value = Integer.toString(fileBinry.readUnsignedByte());
+					offset = fileBinry.getFilePointer();
+				} else if (b == 5) {
+					fileBinry.seek(offset);
+					value = (Integer.toString(fileBinry.readUnsignedShort()));
+					offset = fileBinry.getFilePointer();
+				} else if (b == 6) {
+					fileBinry.seek(offset);
+					value = (Integer.toString(fileBinry.readInt()));
+					offset = fileBinry.getFilePointer();
+				} else if (b == 7) {
+					fileBinry.seek(offset);
+					value = (Long.toString(fileBinry.readLong()));
+					offset = fileBinry.getFilePointer();
+				} else if (b == 8) {
+
+					fileBinry.seek(offset);
+					value = (Float.toString(fileBinry.readFloat()));
+					offset = fileBinry.getFilePointer();
+				} else if (b == 9) {
+
+					fileBinry.seek(offset);
+					value = (Double.toString(fileBinry.readDouble()));
+					offset = fileBinry.getFilePointer();
+
+				} else if (b == 10) {
+					fileBinry.seek(offset);
+
+					long timeInEpoch = fileBinry.readLong();
+
+					value = Long.toString(timeInEpoch);
+					offset = fileBinry.getFilePointer();
+				} else if (b == 11) {
+					fileBinry.seek(offset);
+
+					long timeInEpoch = fileBinry.readLong();
+					value = Long.toString(timeInEpoch);
+
+					// value = (Long.toString(binaryFile.readLong()));
+					offset = fileBinry.getFilePointer();
+				} else {
+					byte[] text = new byte[b - 12];
+					fileBinry.seek(offset);
+
+					fileBinry.read(text);
+					value = (new String(text));
+					offset = fileBinry.getFilePointer();
+
+				}
+
+				if (currentColIndex == colIndex) {
+
+					switch (searchDataType.trim().toLowerCase()) {
+
+					case TINYINT:
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null
+								&& value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+						} else if (value != null
+								&& valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& Integer.parseInt(valueToBeSearched) == Integer
+										.parseInt(value)) {
+							matchFound = true;
+						}
+						break;
+					case SMALLINT:
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null
+								&& value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+						} else if (value != null
+								&& valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& Integer.parseInt(valueToBeSearched) == Integer
+										.parseInt(value)) {
+							matchFound = true;
+						}
+						break;
+					case INT:
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null
+								&& value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+						} else if (value != null
+								&& valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& Integer.parseInt(valueToBeSearched) == Integer
+										.parseInt(value)) {
+							matchFound = true;
+						}
+						break;
+					case BIGINT:
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null
+								&& value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+						} else if (value != null
+								&& valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& Long.parseLong(valueToBeSearched) == Long
+										.parseLong(value)) {
+							matchFound = true;
+						}
+						break;
+					case REAL:
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null
+								&& value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+						} else if (value != null
+								&& valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& Float.parseFloat(valueToBeSearched) == Float
+										.parseFloat(value)) {
+							matchFound = true;
+						}
+						break;
+					case DOUBLE:
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null
+								&& value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+						} else if (value != null
+								&& valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& Double.parseDouble(valueToBeSearched) == Double
+										.parseDouble(value)) {
+							matchFound = true;
+						}
+						break;
+					case DATETIME:
+						long epochSeconds = 0;
+
+						if (value != null && value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+							break;
+						}
+
+						if (value != null && !value.equalsIgnoreCase("null")) {
+							SimpleDateFormat df = new SimpleDateFormat(
+									"yyyy-MM-dd_HH:mm:ss");
+
+							Date date;
+							try {
+								date = df.parse(valueToBeSearched);
+
+								ZonedDateTime zdt = ZonedDateTime.ofInstant(
+										date.toInstant(), zoneId);
+
+								epochSeconds = zdt.toInstant().toEpochMilli() / 1000;
+							} catch (Exception e) {
+
+							}
+
+						}
+
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null && valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& (epochSeconds) == Long.parseLong(value)) {
+
+							Instant ii = Instant.ofEpochSecond(epochSeconds);
+							ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii,
+									zoneId);
+							SimpleDateFormat sdf = new SimpleDateFormat(
+									"yyyy-MM-dd_HH:mm:ss");
+							Date date = Date.from(zdt2.toInstant());
+							value = sdf.format(date);
+
+							matchFound = true;
+						}
+						break;
+					case DATE2:
+						long epocSecs = 0;
+						if (value != null && value.equalsIgnoreCase("null")
+								&& value.equalsIgnoreCase(valueToBeSearched)) {
+							matchFound = true;
+							break;
+						}
+
+						if (value != null && !value.equalsIgnoreCase("null")) {
+							SimpleDateFormat df = new SimpleDateFormat(
+									"yyyy-MM-dd");
+
+							Date date;
+							try {
+								date = df.parse(valueToBeSearched);
+
+								ZonedDateTime zdt = ZonedDateTime.ofInstant(
+										date.toInstant(), zoneId);
+
+								epocSecs = zdt.toInstant().toEpochMilli() / 1000;
+							} catch (Exception e) {
+
+							}
+
+						}
+
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null && valueToBeSearched != null
+								&& !value.equalsIgnoreCase("null")
+								&& (epocSecs) == Long.parseLong(value)) {
+
+							Instant ii = Instant.ofEpochSecond(epocSecs);
+							ZonedDateTime zdt2 = ZonedDateTime.ofInstant(ii,
+									zoneId);
+							SimpleDateFormat sdf = new SimpleDateFormat(
+									"yyyy-MM-dd");
+							Date date = Date.from(zdt2.toInstant());
+							value = sdf.format(date);
+							matchFound = true;
+						}
+						break;
+					case TEXT:
+						if (value == null && value == valueToBeSearched) {
+							matchFound = true;
+						} else if (value != null && valueToBeSearched != null
+								&& valueToBeSearched.equalsIgnoreCase(value)) {
+							matchFound = true;
+						}
+
+						break;
+					}
+
+					break;
+				}
+				currentColIndex++;
+			}
+
+			if (matchFound) {
+				offsetForSerialType = offsetForSerialTypeMatch;
+				offset = offSetForDataMatch;
+
+				for (String key : token.keySet()) {
+
+					if (i == 0) {
+						arrayOfValues.add(actualRowID.toString());
+						token.put(key, new ArrayList<String>(arrayOfValues));
+						i++;
+						arrayOfValues.clear();
+						continue;
+					}
+
+					fileBinry.seek(offsetForSerialType);
+					short b = fileBinry.readByte();
+					offsetForSerialType = fileBinry.getFilePointer();
+					if (b == 0) {
+
+						fileBinry.seek(offset);
+						int p = (fileBinry.readUnsignedByte());
+						arrayOfValues.add("NULL");
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+
+					} else if (b == 1) {
+
+						fileBinry.seek(offset);
+						int p = (fileBinry.readUnsignedShort());
+						arrayOfValues.add("NULL");
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+
+					} else if (b == 2) {
+						fileBinry.seek(offset);
+						int p = (fileBinry.readInt());
+						arrayOfValues.add("NULL");
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 3) {
+
+						fileBinry.seek(offset);
+						int p = (int) (fileBinry.readDouble());
+						arrayOfValues.add("NULL");
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+
+					} else if (b == 12) {
+						arrayOfValues.add("NULL");
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 4) {
+						fileBinry.seek(offset);
+						arrayOfValues.add(Integer.toString(fileBinry
+								.readUnsignedByte()));
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 5) {
+						fileBinry.seek(offset);
+						arrayOfValues.add(Integer.toString(fileBinry
+								.readUnsignedShort()));
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 6) {
+						fileBinry.seek(offset);
+						arrayOfValues
+								.add(Integer.toString(fileBinry.readInt()));
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 7) {
+						fileBinry.seek(offset);
+						arrayOfValues.add(Long.toString(fileBinry.readLong()));
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 8) {
+
+						fileBinry.seek(offset);
+						arrayOfValues
+								.add(Float.toString(fileBinry.readFloat()));
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 9) {
+
+						fileBinry.seek(offset);
+						arrayOfValues.add(Double.toString(fileBinry
+								.readDouble()));
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+
+					} else if (b == 10) {
+						fileBinry.seek(offset);
+
+						Instant ii = Instant.ofEpochSecond(fileBinry
+								.readLong());
+						ZonedDateTime zdt2 = ZonedDateTime
+								.ofInstant(ii, zoneId);
+						SimpleDateFormat sdf = new SimpleDateFormat(
+								"yyyy-MM-dd_HH:mm:ss");
+						Date date = Date.from(zdt2.toInstant());
+						arrayOfValues.add(sdf.format(date));
+
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else if (b == 11) {
+						fileBinry.seek(offset);
+						// arrayOfValues.add(Long.toString(binaryFile.readLong()));
+
+						Instant ii = Instant.ofEpochSecond(fileBinry
+								.readLong());
+						ZonedDateTime zdt2 = ZonedDateTime
+								.ofInstant(ii, zoneId);
+						SimpleDateFormat sdf = new SimpleDateFormat(
+								"yyyy-MM-dd");
+						Date date = Date.from(zdt2.toInstant());
+
+						arrayOfValues.add(sdf.format(date));
+
+						offset = fileBinry.getFilePointer();
+						token.put(key, new ArrayList<String>(arrayOfValues));
+					} else {
+						byte[] text = new byte[b - 12];
+						fileBinry.seek(offset);
+
+						fileBinry.read(text);
+						arrayOfValues.add(new String(text));
+						offset = fileBinry.getFilePointer();
+
+						token.put(key, new ArrayList<String>(arrayOfValues));
+
+					}
+					arrayOfValues.clear();
+				}
+			}
+
+			if (!matchFound)
+				token = null;
+
+		} catch (Exception e) {
+			System.out.println("Unexpected Error");
+		}
+
+		return token;
+	}
+	
+
+
+	/**
+	 * FYI: Header format - https://sqlite.org/fileformat2.html
+	 */
+	private void writePageHeader(int pageLocation, boolean isLeaf,
+			int no_of_Cells, int rightPage) {
+		int type = LEAF;
+		int pointer = -1;
+		if (!isLeaf) {
+			type = INTERNAL;
+			pointer = rightPage;
+			no_of_Cells = 0;
+		}
+		try {
+			fileBinry.seek((pageLocation - 1) * pageSize);
+
+			fileBinry.write(type);
+			NO_OF_CELLS_HEADER = fileBinry.getFilePointer();
+			fileBinry.write(no_of_Cells);
+			START_OF_CELL_HEADER = fileBinry.getFilePointer();
+			fileBinry.writeShort((int) (pageLocation * pageSize));
+			pageHeader_Offset_rightPagePointer = fileBinry.getFilePointer();
+			fileBinry.writeInt(pointer);
+			pageHeader_array_offset = fileBinry.getFilePointer();
+			pageHeader_offset = pageHeader_array_offset;
+		} catch (Exception e) {
+			System.out.println("Error: " + e.getMessage());
+		}
+	}
+
+	private void readPageHeader(int pageLocation) {
+		try {
+			int currentPageIdx = currentPage - 1;
+			fileBinry.seek(currentPageIdx * pageSize);
+
+			int flag = fileBinry.readUnsignedByte();
+
+			isLeafPage = flag == LEAF;
+
+			NO_OF_CELLS_HEADER = (currentPageIdx * pageSize)
+					+ NODE_TYPE_OFFSET;
+			int noOfCells = fileBinry.readUnsignedByte();
+			START_OF_CELL_HEADER = fileBinry.getFilePointer();
+			fileBinry.readUnsignedShort();
+			pageHeader_Offset_rightPagePointer = fileBinry.getFilePointer();
+			fileBinry.readInt();
+			pageHeader_array_offset = fileBinry.getFilePointer();
+			pageHeader_offset = fileBinry.getFilePointer() + (2 * noOfCells);
+
+		} catch (Exception e) {
+			System.out.println("Unexpected Error" + e.getMessage());
+
+		}
+
+	}
+
+	public boolean close() {
+		try {
+			fileBinry.close();
+			return true;
+		} catch (IOException e) {
+			System.out.println("Unexpected Error");
+			return false;
+		}
+	}
+
+	private void createPage(LinkedList<byte[]> pageCells) {
+		try {
+			fileBinry.setLength(pageSize * currentPage);
+			writePageHeader(currentPage, true, pageCells.size(), -1);
+			readPageHeader(currentPage);
+
+			pageHeader_offset = pageHeader_array_offset;
+			ListIterator<byte[]> iterator = pageCells.listIterator(pageCells
+					.size());
+
+			long cellStartOffset = 0;
+
+			fileBinry.seek(START_OF_CELL_HEADER);
+			fileBinry.writeShort(currentPage * (pageSize));
+			while (iterator.hasPrevious()) {
+				byte[] s = iterator.previous();
+
+				fileBinry.seek(START_OF_CELL_HEADER);
+
+				cellStartOffset = ((long) fileBinry.readUnsignedShort())
+						- (s.length);
+				writeCellInBytes(currentPage, s, cellStartOffset);
+
+			}
+		} catch (Exception e) {
+			System.out.println("Unexpected Error");
+		}
+	}
+
+	private void writeSrl(Map<String, ArrayList<String>> token)
 			throws IOException {
 		// n - bytes Serial code Types , one for each column
 		for (String key : token.keySet()) {
@@ -2113,73 +2222,73 @@ public class BTree {
 			case TINYINT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(4);
+					fileBinry.write(4);
 				} else {
-					binaryFile.write(0);
+					fileBinry.write(0);
 				}
 				break;
 			case SMALLINT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(5);
+					fileBinry.write(5);
 				} else {
-					binaryFile.write(1);
+					fileBinry.write(1);
 				}
 				break;
 			case INT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(6);
+					fileBinry.write(6);
 				} else {
-					binaryFile.write(2);
+					fileBinry.write(2);
 				}
 				break;
 			case BIGINT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(7);
+					fileBinry.write(7);
 				} else {
-					binaryFile.write(3);
+					fileBinry.write(3);
 				}
 				break;
 			case REAL:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(8);
+					fileBinry.write(8);
 				} else {
-					binaryFile.write(2);
+					fileBinry.write(2);
 				}
 				break;
 			case DOUBLE:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(9);
+					fileBinry.write(9);
 				} else {
-					binaryFile.write(3);
+					fileBinry.write(3);
 				}
 				break;
 			case DATETIME:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(10);
+					fileBinry.write(10);
 				} else {
-					binaryFile.write(3);
+					fileBinry.write(3);
 				}
 				break;
 			case DATE2:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(11);
+					fileBinry.write(11);
 				} else {
-					binaryFile.write(3);
+					fileBinry.write(3);
 				}
 				break;
 			case TEXT:
 				if (data_type.get(1) != null
 						&& !data_type.get(1).trim().equalsIgnoreCase("null")) {
-					binaryFile.write(12 + (data_type.get(1).length()));
+					fileBinry.write(12 + (data_type.get(1).length()));
 				} else {
-					binaryFile.write(12);
+					fileBinry.write(12);
 				}
 				break;
 
@@ -2187,101 +2296,7 @@ public class BTree {
 
 		}
 	}
-
-	/**
-	 * FYI: Header format - https://sqlite.org/fileformat2.html
-	 */
-	private void writePageHeader(int pageLocation, boolean isLeaf,
-			int no_of_Cells, int rightPage) {
-		int type = NODE_LEAF;
-		int pointer = -1;
-		if (!isLeaf) {
-			type = NODE_INTERNAL;
-			pointer = rightPage;
-			no_of_Cells = 0;
-		}
-		try {
-			binaryFile.seek((pageLocation - 1) * pageSize);
-
-			binaryFile.write(type);
-			pageHeader_Offset_noOfCells = binaryFile.getFilePointer();
-			binaryFile.write(no_of_Cells);
-			pageHeader_Offset_startOfCell = binaryFile.getFilePointer();
-			binaryFile.writeShort((int) (pageLocation * pageSize));
-			pageHeader_Offset_rightPagePointer = binaryFile.getFilePointer();
-			binaryFile.writeInt(pointer);
-			pageHeader_array_offset = binaryFile.getFilePointer();
-			pageHeader_offset = pageHeader_array_offset;
-		} catch (Exception e) {
-			System.out.println("Error: " + e.getMessage());
-		}
-	}
-
-	private void readPageHeader(int pageLocation) {
-		try {
-			int currentPageIdx = currentPage - 1;
-			binaryFile.seek(currentPageIdx * pageSize);
-
-			int flag = binaryFile.readUnsignedByte();
-
-			isLeafPage = flag == NODE_LEAF;
-
-			pageHeader_Offset_noOfCells = (currentPageIdx * pageSize)
-					+ NODE_TYPE_OFFSET;
-			int noOfCells = binaryFile.readUnsignedByte();
-			pageHeader_Offset_startOfCell = binaryFile.getFilePointer();
-			binaryFile.readUnsignedShort();
-			pageHeader_Offset_rightPagePointer = binaryFile.getFilePointer();
-			binaryFile.readInt();
-			pageHeader_array_offset = binaryFile.getFilePointer();
-			pageHeader_offset = binaryFile.getFilePointer() + (2 * noOfCells);
-
-		} catch (Exception e) {
-			System.out.println("Unexpected Error" + e.getMessage());
-
-		}
-
-	}
-
-	public boolean close() {
-		try {
-			binaryFile.close();
-			return true;
-		} catch (IOException e) {
-			System.out.println("Unexpected Error");
-			return false;
-		}
-	}
-
-	private void createPage(LinkedList<byte[]> pageCells) {
-		try {
-			binaryFile.setLength(pageSize * currentPage);
-			writePageHeader(currentPage, true, pageCells.size(), -1);
-			readPageHeader(currentPage);
-
-			pageHeader_offset = pageHeader_array_offset;
-			ListIterator<byte[]> iterator = pageCells.listIterator(pageCells
-					.size());
-
-			long cellStartOffset = 0;
-
-			binaryFile.seek(pageHeader_Offset_startOfCell);
-			binaryFile.writeShort(currentPage * (pageSize));
-			while (iterator.hasPrevious()) {
-				byte[] s = iterator.previous();
-
-				binaryFile.seek(pageHeader_Offset_startOfCell);
-
-				cellStartOffset = ((long) binaryFile.readUnsignedShort())
-						- (s.length);
-				writeCellInBytes(currentPage, s, cellStartOffset);
-
-			}
-		} catch (Exception e) {
-			System.out.println("Unexpected Error");
-		}
-	}
-
+	
 	public String getPrimaryKey() {
 		return tableKey;
 	}
