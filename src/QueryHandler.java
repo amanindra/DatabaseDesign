@@ -15,10 +15,10 @@ public class QueryHandler {
     this.commandType = type;
   }
 
-  public static void createSequence(String tableName, String colName, int seed, int incrementBy) throws IOException {
-	    String seqName = Utility.getSequenceName(tableName, colName);
+  public static void createSequence(String tableName, String columnName, int seed, int incrementBy) throws IOException {
+	    String sequenceName = Utility.getSequenceName(tableName, columnName);
 	    try {
-	      RandomAccessFile file = new RandomAccessFile(Utility.getFilePath("seq", seqName), "rw");
+	      RandomAccessFile file = new RandomAccessFile(Utility.getFilePath("seq", sequenceName), "rw");
 	      file.setLength(0);
 	      file.setLength(MyDatabase.pageSize);
 	      file.seek(0);
@@ -57,14 +57,14 @@ public class QueryHandler {
       }
     }
     for (int i : size)
-      System.out.print("+" + Utility.repeat("-", i));
+      System.out.print("+" + Utility.displayLine("-", i));
     System.out.print("+\n");
     k = 0;
     for (String x : table.get(0).keySet())
       System.out.print("|" + Utility.format(x.toUpperCase(), size[k++]));
     System.out.print("|\n");
     for (int i : size)
-      System.out.print("+" + Utility.repeat("-", i));
+      System.out.print("+" + Utility.displayLine("-", i));
     System.out.print("+\n");
     for (LinkedHashMap<String, ArrayList<String>> x : table) {
       k = 0;
@@ -72,40 +72,12 @@ public class QueryHandler {
         System.out.print("|" + Utility.format(x.get(y).get(0), size[k++]));
       System.out.print("|\n");
       for (int i : size)
-        System.out.print("+" + Utility.repeat("-", i));
+        System.out.print("+" + Utility.displayLine("-", i));
       System.out.print("+\n");
     }
   }
 
-  public static void help() {
-	    System.out.println(Utility.repeat("*", 80));
-	    System.out.println("SUPPORTED COMMANDS");
-	    System.out.println("All commands below are case insensitive");
-	    System.out.println();
-	    System.out.println(
-	        "\tCREATE TABLE table_name (row_id INT PRIMARY KEY, column_name1 data_type2 [NOT NULL][UNIQUE][AUTOINCREMENT][DEFAULT],... );                         Create a new table schema if not already exist.");
-	    System.out.println("\tSELECT * FROM table_name;                        Display all records in the table.");
-	    System.out
-	        .println("\tSELECT * FROM table_name WHERE <column_name> = <value>;  Display records whose column is <value>.");
-	    System.out.println(
-	        "\tUPDATE <table_name> SET column_name = value WHERE <row_id = value>;  Modifies one or more records in a table.");
-	    System.out.println(
-	        "\tINSERT INTO <table_name> (column_list) VALUES (value1, value2, value3,..);  Insert a new record into the indicated table.");
-	    System.out.println(
-	        "\tDELETE FROM <table_name> WHERE row_id = key_value; Delete a single row/record from a table given the row_id primary key.");
-	    System.out.println("\tDROP TABLE table_name;                           Remove table data and its schema.");
-	    System.out
-	        .println("\tSHOW TABLES;                                     Displays a list of all tables in the Database.");
-	    System.out.println("\tVERSION;                                         Show the program version.");
-	    System.out.println("\tHISTORY;                                         Show all recent commands.");
-	    System.out.println("\tHELP;                                            Show this help information");
-	    System.out.println("\tEXIT;                                            Exit the program");
-	    System.out.println();
-	    System.out.println();
-	    System.out.println(Utility.repeat("*", 80));
-	  }
-
-	  public static void printHistory() {
+  public static void printHistory() {
 	    int len = MyDatabase.history.size();
 	    if (len == 0) {
 	      System.out.println("No history found!");
@@ -199,11 +171,11 @@ public class QueryHandler {
 
 
 
-  public static void update(String tblName, String colName) throws IOException {
-	    String name = Utility.getSequenceName(tblName, colName);
+  public static void update(String tableName, String columnName) throws IOException {
+	  String sequenceName = Utility.getSequenceName(tableName, columnName);
 	    int value = 0;
 	    try {
-	      RandomAccessFile file = new RandomAccessFile(Utility.getFilePath("seq", name), "rw");
+	      RandomAccessFile file = new RandomAccessFile(Utility.getFilePath("seq", sequenceName), "rw");
 	      file.seek(0);
 	      int seed = file.readInt();
 	      int incrementBy =  file.readInt();
@@ -223,12 +195,12 @@ public class QueryHandler {
 	    return;
 	  }
   
-  public static int nextValueInSequence(String tableName, String colName) throws IOException {
-    String seqName = Utility.getSequenceName(tableName, colName);
+  public static int nextValueInSequence(String tableName, String columnName) throws IOException {
+    String sequenceName = Utility.getSequenceName(tableName, columnName);
 
     int value = 0;
     try {
-      RandomAccessFile seqFile = new RandomAccessFile(Utility.getFilePath("seq", seqName), "rw");
+      RandomAccessFile seqFile = new RandomAccessFile(Utility.getFilePath("seq", sequenceName), "rw");
       seqFile.seek(0);
       int seed = seqFile.readInt();
       int incrementBy =  seqFile.readInt();
@@ -242,6 +214,25 @@ public class QueryHandler {
     }
     return value;
   }
-
-
+  
+  public static void help() {
+	    System.out.println(Utility.displayLine("*", 170));
+	    System.out.println("SUPPORTED COMMANDS");
+	    System.out.println("All commands below are case insensitive");
+	    System.out.println();
+	    System.out.println("\tCREATE TABLE table_name (row_id INT PRIMARY KEY, name text);                        Create a new table schema if not already exist.");
+	    System.out.println("\tSHOW TABLES;                                                                        Displays a list of all tables in the Database.");
+	    System.out.println("\tDROP TABLE table_name;                                                              Remove table data and its schema.");
+	    System.out.println("\tSELECT * FROM table_name;                                                           Display all records in the table.");
+	    System.out.println("\tSELECT * FROM table_name WHERE <column_name> = <value>;                             Display records whose column is <value>.");
+	    System.out.println("\tINSERT INTO <table_name> VALUES (value1, value2, ...);                              Insert a new record into the indicated table.");
+	    System.out.println("\tDELETE FROM <table_name> WHERE row_id = key_value;                                  Delete a single row/record from a table given the row_id primary key.");
+	    System.out.println("\tUPDATE <table_name> SET column_name = value WHERE row_id = value;                   Modifies one or more records in a table.");
+	    System.out.println("\tVERSION;                                                                            Show the program version.");
+	    System.out.println("\tHISTORY;                                                                            Show all recent commands.");
+	    System.out.println("\tHELP;                                                                               Show this help information");
+	    System.out.println("\tEXIT;                                                                               Exit the program");
+	    System.out.println();
+	    System.out.println(Utility.displayLine("*", 170));
+  }
 }
