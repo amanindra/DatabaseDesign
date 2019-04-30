@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class QueryHandler {
   public String commandType;
@@ -100,12 +101,12 @@ public class QueryHandler {
   }
 
   public static boolean dropTable(String tableName) {
-    boolean isDropped = false;
+    AtomicBoolean isDropped = new AtomicBoolean(false);
     int flag = 1;
-    RandomAccessFile dropTableFile = null;
+    RandomAccessFile dropTableFile;
     File folder = new File(Utility.getOSPath(new String[] { MyDatabase.tableLocation, MyDatabase.userDataFolder }));
     File[] listOfFiles = folder.listFiles();
-    RandomAccessFile mDBColumnFile, mDBtableFile;
+    RandomAccessFile dbColumnFile, dbTableFile;
     for (int i = 0; i < listOfFiles.length; i++)
       if (listOfFiles[i].getName().equals(tableName + ".tbl")) {
         flag = 0;
@@ -116,8 +117,8 @@ public class QueryHandler {
     }
 
     try {
-      mDBColumnFile = new RandomAccessFile(Utility.getFilePath("master", MyDatabase.masterColumnTableName), "rw");
-      mDBtableFile = new RandomAccessFile(Utility.getFilePath("master", MyDatabase.masterTableName), "rw");
+      dbColumnFile = new RandomAccessFile(Utility.getFilePath("master", MyDatabase.masterColumnTableName), "rw");
+      dbTableFile = new RandomAccessFile(Utility.getFilePath("master", MyDatabase.masterTableName), "rw");
       dropTableFile = new RandomAccessFile(Utility.getFilePath("user", tableName), "rw");
     } catch (FileNotFoundException e1) {
       System.out.println(" Table file not found");
@@ -133,45 +134,52 @@ public class QueryHandler {
     } catch (IOException e) {
       return false;
     }
-    BTree tableBTree = new BTree(mDBtableFile, MyDatabase.masterTableName, false, true);
-    BTree columnBTree = new BTree(mDBColumnFile, MyDatabase.masterColumnTableName, true, false);
+    BTree tableBTree = new BTree(dbTableFile, MyDatabase.masterTableName, false, true);
+    BTree columnBTree = new BTree(dbColumnFile, MyDatabase.masterColumnTableName, true, false);
     ArrayList<String> arryL = new ArrayList<String>();
     arryL.add(new Integer(1).toString()); // search cond col ordinal
     // position
     arryL.add("text"); // search cond col data type
     arryL.add(tableName); // search cond col value
     List<LinkedHashMap<String, ArrayList<String>>> op = tableBTree.searchWithNonPK(arryL);
-    for (LinkedHashMap<String, ArrayList<String>> map : op) {
+    op.forEach(map -> helperQueryHandlerDrop(isDropped, tableBTree, map)
+
+            );
+
+    /*for (LinkedHashMap<String, ArrayList<String>> map : op) {
       Integer rowId = Integer.parseInt(map.get("rowid").get(0));
       LinkedHashMap<String, ArrayList<String>> token = new LinkedHashMap<String, ArrayList<String>>();
       ArrayList<String> array = new ArrayList<String>();
       array.add("int");
       array.add(rowId.toString());
       token.put("rowid", new ArrayList<String>(array));
-      isDropped = tableBTree.deleteRecord(token);
+      isDropped.set(tableBTree.deleteRecord(token));
 
-    }
-    arryL = new ArrayList<String>();
+    }*/
+    arryL = new ArrayList<>();
     arryL.add(new Integer(1).toString()); // search cond col ordinal
     // position
     arryL.add("text"); // search cond col data type
     arryL.add(tableName); // search cond col value
     List<LinkedHashMap<String, ArrayList<String>>> opp = columnBTree.searchWithNonPK(arryL);
-    for (LinkedHashMap<String, ArrayList<String>> map : opp) {
-      Integer rowId = Integer.parseInt(map.get("rowid").get(0));
-      LinkedHashMap<String, ArrayList<String>> token = new LinkedHashMap<String, ArrayList<String>>();
-      ArrayList<String> array = new ArrayList<String>();
-      array.add("int");
-      array.add(rowId.toString());
-      token.put("rowid", new ArrayList<String>(array));
-      isDropped = columnBTree.deleteRecord(token);
-    }
-    return isDropped;
+    opp.forEach(map -> helperQueryHandlerDrop(isDropped, tableBTree, map)
+
+      );
+    return isDropped.get();
   }
 
+    private static void helperQueryHandlerDrop(AtomicBoolean isDropped, BTree tableBTree, LinkedHashMap<String, ArrayList<String>> map) {
+        Integer rowId = Integer.parseInt(map.get("rowid").get(0));
+        LinkedHashMap<String, ArrayList<String>> token = new LinkedHashMap<>();
+        ArrayList<String> array = new ArrayList<>();
+        array.add("int");
+        array.add(rowId.toString());
+        token.put("rowid", new ArrayList<>(array));
+        isDropped.set(tableBTree.deleteRecord(token));
+    }
 
 
-  public static void update(String tableName, String columnName) throws IOException {
+    public static void update(String tableName, String columnName) throws IOException {
 	  String sequenceName = Utility.getSequenceName(tableName, columnName);
 	    int value = 0;
 	    try {

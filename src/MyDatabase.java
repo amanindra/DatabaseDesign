@@ -24,9 +24,9 @@ public class MyDatabase {
 	static long pageSize = 512;
 	static Scanner scanner = new Scanner(System.in).useDelimiter(";");
 
-	private static void buildDBColumnTable(RandomAccessFile mDBColumnFile,
-			BTree mDBColumnFiletree) throws Exception {
-		if (mDBColumnFile.length() > 0)
+	private static void buildDBColumnTable(RandomAccessFile dbColumnFile,
+			BTree dbColumnFileTree) throws Exception {
+		if (dbColumnFile.length() > 0)
 			return;
 
 		LinkedHashMap<String, ArrayList<String>> token;
@@ -34,92 +34,82 @@ public class MyDatabase {
 		token = Utility.buildInsertRecord(Arrays.asList("1",
 				MyDatabase.masterTableName, "rowid", "int", "1", "no", "na",
 				"no", "no"));
-		mDBColumnFiletree.createNewTableLeaf(token);
+		dbColumnFileTree.createNewTableLeaf(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("2",
 				MyDatabase.masterTableName, "table_name", "text", "2", "no",
 				"na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("3",
 				MyDatabase.masterColumnTableName, "rowid", "int", "1", "no",
 				"na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("4",
 				MyDatabase.masterColumnTableName, "table_name", "text", "2",
 				"no", "na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("5",
 				MyDatabase.masterColumnTableName, "column_name", "text", "3",
 				"no", "na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("6",
 				MyDatabase.masterColumnTableName, "data_type", "text", "4",
 				"no", "na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("7",
 				MyDatabase.masterColumnTableName, "ordinal_position",
 				"tinyint", "5", "no", "na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("8",
 				MyDatabase.masterColumnTableName, "is_nullable", "text", "6",
 				"no", "na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("9",
 				MyDatabase.masterColumnTableName, "default", "text", "7", "no",
 				"na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 
 		token = Utility.buildInsertRecord(Arrays.asList("10",
 				MyDatabase.masterColumnTableName, "is_unique", "text", "8",
 				"no", "na", "no", "no"));
-		mDBColumnFiletree.insertNewRecord(token);
+		dbColumnFileTree.insertNewRecord(token);
 	}
 
-	private static void buildDatabase(RandomAccessFile mDBtableFile,
-			BTree mDBtabletree) throws Exception {
-		if (mDBtableFile.length() > 0)
+	private static void buildDatabase(RandomAccessFile dbTableFile,
+			BTree dbTableTree) throws Exception {
+		if (dbTableFile.length() > 0)
 			return;
 
-		LinkedHashMap<String, ArrayList<String>> token = new LinkedHashMap<String, ArrayList<String>>();
-		token.put("rowid", new ArrayList<String>(Arrays.asList("int", "1")));
+		LinkedHashMap<String, ArrayList<String>> token = new LinkedHashMap<>();
+		token.put("rowid", new ArrayList<>(Arrays.asList("int", "1")));
 		token.put(
 				"table_name",
-				new ArrayList<String>(Arrays.asList("text",
+				new ArrayList<>(Arrays.asList("text",
 						MyDatabase.masterTableName)));
-		mDBtabletree.createNewTableLeaf(token);
+		dbTableTree.createNewTableLeaf(token);
 
 		token.clear();
-		token.put("rowid", new ArrayList<String>(Arrays.asList("int", "2")));
+		token.put("rowid", new ArrayList<>(Arrays.asList("int", "2")));
 		token.put(
 				"table_name",
-				new ArrayList<String>(Arrays.asList("text",
+				new ArrayList<>(Arrays.asList("text",
 						MyDatabase.masterColumnTableName)));
-		mDBtabletree.insertNewRecord(token);
+		dbTableTree.insertNewRecord(token);
 	}
 
 	public static void main(String[] args) {
 		// File system setup
 		File folder = new File(tableLocation);
 		if (!folder.exists()) {
-			folder.mkdir();
-			folder = new File(Utility.getOSPath(new String[] { tableLocation,
-					userDataFolder }));
-			folder.mkdir();
-			folder = new File(Utility.getOSPath(new String[] { tableLocation,
-					systemDataFolder }));
-			folder.mkdir();
-			folder = new File(Utility.getOSPath(new String[] { tableLocation,
-					indicesFolder }));
-			folder.mkdir();
-			folder = new File(Utility.getOSPath(new String[] { tableLocation,
-					seqFolder }));
+			folder = getFile(folder, userDataFolder, systemDataFolder);
+			folder = getFile(folder, indicesFolder, seqFolder);
 			folder.mkdir();
 		}
 
@@ -131,13 +121,13 @@ public class MyDatabase {
 			dbColumnFile = new RandomAccessFile(Utility.getFilePath("master",
 					masterColumnTableName), "rw");
 
-			BTree mDBtabletree = new BTree(dbMasterTableFile,
+			BTree dbTableTree = new BTree(dbMasterTableFile,
 					MyDatabase.masterTableName, false, true);
-			BTree mDBColumnFiletree = new BTree(dbColumnFile,
+			BTree dbColumnFileTree = new BTree(dbColumnFile,
 					MyDatabase.masterColumnTableName, true, false);
 
-			buildDatabase(dbMasterTableFile, mDBtabletree);
-			buildDBColumnTable(dbColumnFile, mDBColumnFiletree);
+			buildDatabase(dbMasterTableFile, dbTableTree);
+			buildDBColumnTable(dbColumnFile, dbColumnFileTree);
 
 		} catch (Exception e) {
 			System.out.println("Unexpected Error: " + e.getMessage());
@@ -173,5 +163,15 @@ public class MyDatabase {
 			ParseQuery.parse(userCommand);
 		}
 		System.out.println("We are exiting the database.");
+	}
+
+	private static File getFile(File folder, String userDataFolder, String systemDataFolder) {
+		folder.mkdir();
+		folder = new File(Utility.getOSPath(new String[] { tableLocation,
+				userDataFolder}));
+		folder.mkdir();
+		folder = new File(Utility.getOSPath(new String[] { tableLocation,
+				systemDataFolder}));
+		return folder;
 	}
 }
